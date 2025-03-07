@@ -2,6 +2,7 @@
 #include <U8g2lib.h>
 #include <bitset>
 #include <STM32FreeRTOS.h>
+#include <ES_CAN.h>  // Provided CAN library
 
 // Hardware timer for 22kHz sawtooth wave generation
 HardwareTimer sampleTimer(TIM1);
@@ -13,14 +14,24 @@ volatile uint32_t currentStepSize = 0;  // Shared with ISR
 struct {
     std::bitset<32> inputs;
     SemaphoreHandle_t mutex;
-    int knob3Rotation;      // Volume control knob (0 to 8)
+    int knob3Rotation;
     std::bitset<12> keyStates;
 } sysState;
 
 // Quadrature decoder state for knob 3
 uint8_t prevKnobState = 0;
 
-// Constants
+// Global variable to store the latest received CAN message for display
+uint8_t globalRXMessage[8] = {0};
+
+// Queues for CAN messages
+QueueHandle_t msgInQ;
+QueueHandle_t msgOutQ;
+
+// Semaphore for CAN TX (three available mailbox slots)
+SemaphoreHandle_t CAN_TX_Semaphore;
+
+// Constants (example step sizes)
 const uint32_t stepSizes[12] = {
     51076057, 54113197, 57330935, 60740010,
     64351799, 68178356, 72232452, 76527617,
@@ -40,6 +51,8 @@ U8G2_SSD1305_128X32_ADAFRUIT_F_HW_I2C u8g2(U8G2_R0);
 // Function prototypes
 void scanKeysTask(void *pvParameters);
 void displayUpdateTask(void *pvParameters);
+void CAN_TX_Task(void *pvParameters);
+void CAN_RX_Task(void *pvParameters);
 
 void setOutMuxBit(const uint8_t bitIdx, const bool value) {
     digitalWrite(REN_PIN, LOW);
@@ -71,25 +84,22 @@ std::bitset<4> readCols() {
 
 void sampleISR() {
     static uint32_t phaseAcc = 0;
-    // Atomically load the current step size
     uint32_t stepSize = __atomic_load_n(&currentStepSize, __ATOMIC_RELAXED);
     phaseAcc += stepSize;
     int32_t Vout = (phaseAcc >> 24) - 128;
 
     // Get knob rotation atomically for volume control.
-    // No mutex allowed here so we use an atomic load.
     int knobRot = __atomic_load_n(&sysState.knob3Rotation, __ATOMIC_RELAXED);
     knobRot = constrain(knobRot, 0, 8);
-    // Apply volume control using a right-shift.
+    // Apply volume control using right shift.
     Vout = Vout >> (8 - knobRot);
 
-    // Adjust output for analogWrite (range 0-255)
     analogWrite(OUTR_PIN, Vout + 128);
 }
 
 void updateStepSizeFromKeys(const std::bitset<12>& keyStates) {
     uint32_t localStepSize = 0;
-    // Choose the step size from the last key pressed (if any)
+    // Use the last active key (if any) to choose the step size.
     for (int i = 0; i < 12; i++) {
         if (keyStates[i]) {
             localStepSize = stepSizes[i];
@@ -100,7 +110,7 @@ void updateStepSizeFromKeys(const std::bitset<12>& keyStates) {
 
 std::bitset<12> scanKeys() {
     std::bitset<12> allKeys;
-    // Scan rows 0 to 2 for the key matrix (3 rows x 4 cols = 12 keys)
+    // Scan rows 0 to 2 (3 rows x 4 cols = 12 keys)
     for (uint8_t row = 0; row < 3; row++) {
         setRow(row);
         delayMicroseconds(3);
@@ -135,32 +145,46 @@ void decodeKnob() {
     setRow(3);
     delayMicroseconds(3);
     std::bitset<4> cols = readCols();
-
-    // Combine the two columns: column 0 is A, column 1 is B.
+    // Columns: 0 is A, 1 is B.
     uint8_t currentState = (cols[1] << 1) | cols[0];
 
     int rotation = 0;
-    // Check for normal clockwise transitions.
     if ((prevKnobState == 0b00 && currentState == 0b01) ||
         (prevKnobState == 0b01 && currentState == 0b11) ||
         (prevKnobState == 0b11 && currentState == 0b10) ||
         (prevKnobState == 0b10 && currentState == 0b00)) {
         rotation = +1;
-    }
-    // Check for normal counterclockwise transitions.
-    else if ((prevKnobState == 0b00 && currentState == 0b10) ||
-             (prevKnobState == 0b10 && currentState == 0b11) ||
-             (prevKnobState == 0b11 && currentState == 0b01) ||
-             (prevKnobState == 0b01 && currentState == 0b00)) {
+    } else if ((prevKnobState == 0b00 && currentState == 0b10) ||
+               (prevKnobState == 0b10 && currentState == 0b11) ||
+               (prevKnobState == 0b11 && currentState == 0b01) ||
+               (prevKnobState == 0b01 && currentState == 0b00)) {
         rotation = -1;
     }
-
-    // Update knob rotation atomically using the mutex.
+    
     xSemaphoreTake(sysState.mutex, portMAX_DELAY);
     sysState.knob3Rotation = constrain(sysState.knob3Rotation + rotation, 0, 8);
     xSemaphoreGive(sysState.mutex);
 
     prevKnobState = currentState;
+}
+
+// --- CAN Bus Integration ---
+
+// CAN RX ISR: Reads incoming CAN message and enqueues it.
+void CAN_RX_ISR(void) {
+    uint8_t RX_Message_ISR[8];
+    uint32_t id;
+    CAN_RX(id, RX_Message_ISR);
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    xQueueSendFromISR(msgInQ, RX_Message_ISR, &xHigherPriorityTaskWoken);
+    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+}
+
+// CAN TX ISR: Releases a transmit mailbox slot.
+void CAN_TX_ISR(void) {
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    xSemaphoreGiveFromISR(CAN_TX_Semaphore, &xHigherPriorityTaskWoken);
+    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
 void setup() {
@@ -187,32 +211,58 @@ void setup() {
 
     // Create the mutex BEFORE starting tasks.
     sysState.mutex = xSemaphoreCreateMutex();
-    // Initialize knob3Rotation to maximum (e.g., 8 means no attenuation).
-    sysState.knob3Rotation = 8;
+    sysState.knob3Rotation = 8;  // Initialize knob rotation to maximum (no attenuation)
 
-    // Create tasks: scanKeysTask has higher priority than displayUpdateTask.
+    // --- Initialize CAN Bus ---
+    CAN_Init(true);  // Loopback mode for testing; set to false for normal operation.
+    setCANFilter(0x123, 0x7FF);
+    CAN_RegisterRX_ISR(CAN_RX_ISR);
+    CAN_RegisterTX_ISR(CAN_TX_ISR);
+    CAN_Start();
+
+    // Create CAN message queues.
+    msgInQ = xQueueCreate(36, 8);
+    msgOutQ = xQueueCreate(36, 8);
+
+    // Create the CAN TX semaphore (3 mailboxes available).
+    CAN_TX_Semaphore = xSemaphoreCreateCounting(3, 3);
+
+    // Create tasks.
     xTaskCreate(scanKeysTask, "scanKeys", 128, NULL, 2, NULL);
     xTaskCreate(displayUpdateTask, "displayUpdate", 256, NULL, 1, NULL);
+    xTaskCreate(CAN_TX_Task, "CAN_TX", 128, NULL, 3, NULL);
+    xTaskCreate(CAN_RX_Task, "CAN_RX", 128, NULL, 3, NULL);
     vTaskStartScheduler();
 }
 
 void scanKeysTask(void *pvParameters) {
     const TickType_t xFrequency = 50 / portTICK_PERIOD_MS;
     TickType_t xLastWakeTime = xTaskGetTickCount();
+    static std::bitset<12> previousKeys;  // To detect transitions
+
     while (1) {
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
-        // Scan keys from rows 0-2.
         std::bitset<12> localKeys = scanKeys();
-        
-        // Decode the knob (row 3) for volume control.
         decodeKnob();
         
-        // Update shared key states.
+        // Detect key state changes and send a CAN message for each transition.
+        for (int i = 0; i < 12; i++) {
+            if (localKeys[i] != previousKeys[i]) {
+                uint8_t TX_Message[8] = {0};
+                // Use 'P' for press, 'R' for release.
+                TX_Message[0] = localKeys[i] ? 'P' : 'R';
+                TX_Message[1] = 4;  // Example octave number; adjust as needed.
+                TX_Message[2] = i;  // Note number.
+                // Place message on the transmit queue.
+                xQueueSend(msgOutQ, TX_Message, portMAX_DELAY);
+            }
+        }
+        previousKeys = localKeys;
+        
+        // Update shared key states and step size.
         xSemaphoreTake(sysState.mutex, portMAX_DELAY);
         sysState.keyStates = localKeys;
         xSemaphoreGive(sysState.mutex);
-        
-        // Update step size from key presses (last pressed key wins).
         updateStepSizeFromKeys(localKeys);
     }
 }
@@ -220,10 +270,10 @@ void scanKeysTask(void *pvParameters) {
 void displayUpdateTask(void *pvParameters) {
     const TickType_t xFrequency = 100 / portTICK_PERIOD_MS;
     TickType_t xLastWakeTime = xTaskGetTickCount();
+    
     while (1) {
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
     
-        // Retrieve the current key states and knob value.
         xSemaphoreTake(sysState.mutex, portMAX_DELAY);
         std::bitset<12> localKeys = sysState.keyStates;
         int localKnob = sysState.knob3Rotation;
@@ -235,14 +285,45 @@ void displayUpdateTask(void *pvParameters) {
         u8g2.setCursor(2, 20);
         u8g2.print(localKeys.to_ulong(), HEX);
         displayCurrentNote(localKeys);
-        // Optionally display knob rotation for debugging.
+        
+        // Display knob rotation and latest received CAN message.
         u8g2.setCursor(2, 30);
         u8g2.print("Knob:");
         u8g2.print(localKnob);
+        u8g2.setCursor(70, 30);
+        u8g2.print("RX:");
+        for (int i = 0; i < 8; i++) {
+            u8g2.print((char)globalRXMessage[i]);
+        }
     
         u8g2.sendBuffer();
     
         digitalToggle(LED_BUILTIN);
+    }
+}
+
+void CAN_TX_Task(void *pvParameters) {
+    uint8_t msgOut[8];
+    while (1) {
+        // Block until a message is available on the transmit queue.
+        xQueueReceive(msgOutQ, msgOut, portMAX_DELAY);
+        // Wait for an available transmit mailbox.
+        xSemaphoreTake(CAN_TX_Semaphore, portMAX_DELAY);
+        CAN_TX(0x123, msgOut);
+    }
+}
+
+void CAN_RX_Task(void *pvParameters) {
+    uint8_t msgIn[8];
+    uint32_t id;
+    while (1) {
+        // Block until a CAN message is received.
+        xQueueReceive(msgInQ, msgIn, portMAX_DELAY);
+        // For display purposes, copy the message to a global variable.
+        noInterrupts();
+        memcpy(globalRXMessage, msgIn, 8);
+        interrupts();
+        // Additional processing of the CAN message can be added here.
     }
 }
 
