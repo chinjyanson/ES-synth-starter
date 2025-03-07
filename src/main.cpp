@@ -55,7 +55,7 @@ void setOutMuxBit(const uint8_t bitIdx, const bool value) {
 
 std::bitset<32> readCols() {
   std::bitset<32> result;
-  
+
   // Set bits 0 to 3 from the digital inputs
   result[0] = digitalRead(C0_PIN);
   result[1] = digitalRead(C1_PIN);
