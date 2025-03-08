@@ -9,9 +9,6 @@ HardwareTimer sampleTimer(TIM1);
 
 // Global Variables
 volatile uint32_t currentStepSize = 0;  // Shared with ISR
-volatile bool canTxSuccess = false;
-volatile bool canRxSuccess = false;
-
 
 // System state (FreeRTOS-safe)
 struct {
@@ -34,6 +31,12 @@ QueueHandle_t msgOutQ;
 // Semaphore for CAN TX (three available mailbox slots)
 SemaphoreHandle_t CAN_TX_Semaphore;
 
+// Constants (example step sizes)
+const uint32_t stepSizes[12] = {
+    51076057, 54113197, 57330935, 60740010,
+    64351799, 68178356, 72232452, 76527617,
+    81078186, 85899346, 91007187, 96418756
+};
 
 // Pin definitions
 const int RA0_PIN = D3, RA1_PIN = D6, RA2_PIN = D12, REN_PIN = A5;
@@ -61,30 +64,6 @@ void setOutMuxBit(const uint8_t bitIdx, const bool value) {
     delayMicroseconds(2);
     digitalWrite(REN_PIN, LOW);
 }
-
-std::array<uint32_t, 12> getArray() {
-    int cur_octave = 4;
-    double freq_factor = pow(2, 1.0/12.0);
-    std::array<uint32_t, 12> result = {0};
-    double freq = 0.0;
-
-    for (size_t i = 0; i < 12; i++) {
-        if (i >= 9) {
-            freq = 440 * pow(freq_factor, (i - 9)); 
-        } else {
-            freq = 440 / pow(freq_factor, (9 - i));
-        }
-        if (globalRXMessage[1] != 0) {
-            cur_octave = globalRXMessage[1];
-        }
-        result[i] = ((1 << (cur_octave - 4)) * (pow(2, 32) * freq)) / 22000;
-    }
-    return result;
-}
-
-
-// Constants (example step sizes)
-std::array<uint32_t, 12> stepSizes = getArray();
 
 void setRow(uint8_t row) {
     digitalWrite(REN_PIN, LOW);
@@ -120,26 +99,14 @@ void sampleISR() {
 
 void updateStepSizeFromKeys(const std::bitset<12>& keyStates) {
     uint32_t localStepSize = 0;
-    
-    // ✅ Recalculate stepSizes dynamically based on the latest CAN message
-    // stepSizes = getArray(); 
-
     // Use the last active key (if any) to choose the step size.
     for (int i = 0; i < 12; i++) {
         if (keyStates[i]) {
             localStepSize = stepSizes[i];
         }
     }
-
-    // ✅ Display the step size on the OLED for debugging
-    u8g2.setCursor(2, 20);
-    u8g2.print("Step: ");
-    u8g2.print(globalRXMessage[1]);
-    u8g2.sendBuffer();
-
     __atomic_store_n(&currentStepSize, localStepSize, __ATOMIC_RELAXED);
 }
-
 
 std::bitset<12> scanKeys() {
     std::bitset<12> allKeys;
@@ -160,7 +127,7 @@ void displayCurrentNote(const std::bitset<12>& keyStates) {
         "C ", "C#", "D ", "D#", "E ", "F ",
         "F#", "G ", "G#", "A ", "A#", "B "
     };
-    u8g2.setCursor(60, 30);
+    u8g2.setCursor(60, 20);
     bool foundNote = false;
     for (int i = 0; i < 12; i++) {
         if (keyStates[i]) {
@@ -284,7 +251,7 @@ void scanKeysTask(void *pvParameters) {
                 uint8_t TX_Message[8] = {0};
                 // Use 'P' for press, 'R' for release.
                 TX_Message[0] = localKeys[i] ? 'P' : 'R';
-                TX_Message[1] = 5;  // Example octave number; adjust as needed.
+                TX_Message[1] = 4;  // Example octave number; adjust as needed.
                 TX_Message[2] = i;  // Note number.
                 // Place message on the transmit queue.
                 xQueueSend(msgOutQ, TX_Message, portMAX_DELAY);
@@ -306,39 +273,34 @@ void displayUpdateTask(void *pvParameters) {
     
     while (1) {
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
-
+    
         xSemaphoreTake(sysState.mutex, portMAX_DELAY);
         std::bitset<12> localKeys = sysState.keyStates;
         int localKnob = sysState.knob3Rotation;
         xSemaphoreGive(sysState.mutex);
-
+    
         u8g2.clearBuffer();
         u8g2.setFont(u8g2_font_ncenB08_tr);
         u8g2.drawStr(2, 10, "Keys:");
-        // u8g2.setCursor(2, 20);
-        // u8g2.print(localKeys.to_ulong(), HEX);
-        // displayCurrentNote(localKeys);
+        u8g2.setCursor(2, 20);
+        u8g2.print(localKeys.to_ulong(), HEX);
+        displayCurrentNote(localKeys);
         
-        // Display knob rotation
+        // Display knob rotation and latest received CAN message.
         u8g2.setCursor(2, 30);
         u8g2.print("Knob:");
         u8g2.print(localKnob);
-        
-        // Display CAN status
-        u8g2.setCursor(70, 10);
-        u8g2.print("TX: ");
-        u8g2.print(globalRXMessage[1]);
-
-        u8g2.setCursor(70, 20);
-        u8g2.print("RX: ");
-        u8g2.print(canRxSuccess ? "OK" : "Fail");
-
+        u8g2.setCursor(70, 30);
+        u8g2.print("RX:");
+        for (int i = 0; i < 8; i++) {
+            u8g2.print((char)globalRXMessage[i]);
+        }
+    
         u8g2.sendBuffer();
     
         digitalToggle(LED_BUILTIN);
     }
 }
-
 
 void CAN_TX_Task(void *pvParameters) {
     uint8_t msgOut[8];
@@ -348,9 +310,6 @@ void CAN_TX_Task(void *pvParameters) {
         // Wait for an available transmit mailbox.
         xSemaphoreTake(CAN_TX_Semaphore, portMAX_DELAY);
         CAN_TX(0x123, msgOut);
-        if (CAN_TX(0x123, msgOut) == 0) {
-            canTxSuccess = true;  // ✅ Message successfully sent
-        }
     }
 }
 
@@ -358,13 +317,13 @@ void CAN_RX_Task(void *pvParameters) {
     uint8_t msgIn[8];
     uint32_t id;
     while (1) {
+        // Block until a CAN message is received.
         xQueueReceive(msgInQ, msgIn, portMAX_DELAY);
+        // For display purposes, copy the message to a global variable.
         noInterrupts();
         memcpy(globalRXMessage, msgIn, 8);
-        canRxSuccess = true;  // ✅ Message successfully received
         interrupts();
-
-        stepSizes = getArray();
+        // Additional processing of the CAN message can be added here.
     }
 }
 
