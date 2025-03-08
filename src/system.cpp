@@ -11,6 +11,13 @@ SemaphoreHandle_t CAN_TX_Semaphore;
 U8G2_SSD1305_128X32_ADAFRUIT_F_HW_I2C u8g2(U8G2_R0);
 uint8_t prevKnobState = 0;
 
+SystemState sysState = {
+    .inputs = 0,
+    .mutex = nullptr,  // Will be initialized in initSystem()
+    .knob3Rotation = 0,
+    .keyStates = 0
+};
+
 void setOutMuxBit(const uint8_t bitIdx, const bool value) {
     digitalWrite(REN_PIN, LOW);
     digitalWrite(RA0_PIN, (bitIdx & 0x01) ? HIGH : LOW);

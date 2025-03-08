@@ -12,11 +12,11 @@
 #include "display.hpp"
 #include "knob.hpp"
 
+HardwareTimer sampleTimer(TIM1);
 
 void setup() {
-    HardwareTimer sampleTimer(TIM1);
-    Serial.begin(9600);
-    Serial.println("Intializing System...");
+    // Serial.begin(9600);
+    // Serial.println("Intializing System...");
     initSystem();
     initCAN();
 

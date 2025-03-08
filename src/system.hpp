@@ -23,11 +23,13 @@ void initSystem();  // Function to initialize all system components
 void setRow(uint8_t row);
 std::bitset<4> readCols();
 
-struct {
+struct SystemState {
     std::bitset<32> inputs;
     SemaphoreHandle_t mutex;
     int knob3Rotation;
     std::bitset<12> keyStates;
-} sysState;
+};
+
+extern SystemState sysState;
 
 #endif // SYSTEM_HPP

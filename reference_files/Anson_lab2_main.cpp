@@ -121,9 +121,6 @@ void sampleISR() {
 void updateStepSizeFromKeys(const std::bitset<12>& keyStates) {
     uint32_t localStepSize = 0;
     
-    // ✅ Recalculate stepSizes dynamically based on the latest CAN message
-    // stepSizes = getArray(); 
-
     // Use the last active key (if any) to choose the step size.
     for (int i = 0; i < 12; i++) {
         if (keyStates[i]) {
