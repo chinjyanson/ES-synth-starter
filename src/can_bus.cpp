@@ -54,7 +54,11 @@ void CAN_TX_Task(void *pvParameters) {
 void initCAN() {
     CAN_Init(false);
     setCANFilter(0, 0);
+    #ifndef DISABLE_CAN_RX_ISR
     CAN_RegisterRX_ISR(CAN_RX_ISR);
+    #endif
+    #ifndef DISABLE_CAN_TX_ISR
     CAN_RegisterTX_ISR(CAN_TX_ISR);
+    #endif
     CAN_Start();
 }
