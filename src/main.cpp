@@ -26,6 +26,7 @@ void setup() {
 
     xTaskCreate(scanKeysTask, "scanKeys", 128, NULL, 2, NULL);
     xTaskCreate(displayUpdateTask, "displayUpdate", 256, NULL, 1, NULL);
+    xTaskCreate(CAN_TX_Task, "CAN_TX", 128, NULL, 3, NULL);
     xTaskCreate(CAN_RX_Task, "CAN_RX", 128, NULL, 3, NULL);
     vTaskStartScheduler();
 }

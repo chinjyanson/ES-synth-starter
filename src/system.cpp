@@ -10,6 +10,10 @@ QueueHandle_t msgOutQ;
 SemaphoreHandle_t CAN_TX_Semaphore;
 uint8_t prevKnobState = 0;
 
+bool canTxSuccess = false;
+bool canRxSuccess = false;
+
+
 SystemState sysState = {
     .inputs = 0,
     .mutex = nullptr,  // Will be initialized in initSystem()

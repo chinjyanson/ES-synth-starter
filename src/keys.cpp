@@ -36,7 +36,7 @@ void scanKeysTask(void *pvParameters) {
                 uint8_t TX_Message[8] = {0};
                 // Use 'P' for press, 'R' for release.
                 TX_Message[0] = localKeys[i] ? 'P' : 'R';
-                TX_Message[1] = 5;  // Example octave number; adjust as needed.
+                TX_Message[1] = 4;  // Example octave number; adjust as needed.
                 TX_Message[2] = i;  // Note number.
                 // Place message on the transmit queue.
                 xQueueSend(msgOutQ, TX_Message, portMAX_DELAY);

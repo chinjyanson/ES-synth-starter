@@ -31,6 +31,7 @@ void CAN_RX_Task(void *pvParameters) {
         interrupts();
 
         xSemaphoreTake(sysMutex, portMAX_DELAY);
+        canRxSuccess = true;
         stepSizes = getArray();
         xSemaphoreGive(sysMutex);
     }
@@ -44,6 +45,9 @@ void CAN_TX_Task(void *pvParameters) {
         // Wait for an available transmit mailbox.
         xSemaphoreTake(CAN_TX_Semaphore, portMAX_DELAY);
         CAN_TX(0x123, msgOut);
+        if (CAN_TX(0x123, msgOut) == 0) {
+            canTxSuccess = true;  // ✅ Message successfully sent
+        }
     }
 }
 

@@ -52,7 +52,11 @@ void displayUpdateTask(void *pvParameters) {
         // Display CAN status
         u8g2.setCursor(70, 10);
         u8g2.print("TX: ");
-        u8g2.print(globalRXMessage[1]);
+        u8g2.print(canTxSuccess ? "OK" : "Fail");
+
+        u8g2.setCursor(70, 20);
+        u8g2.print("RX: ");
+        u8g2.print(canRxSuccess ? "OK" : "Fail");
 
         u8g2.sendBuffer();
     

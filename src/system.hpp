@@ -31,4 +31,7 @@ struct SystemState {
 
 extern SystemState sysState;
 
+extern bool canTxSuccess;
+extern bool canRxSuccess;
+
 #endif // SYSTEM_HPP
