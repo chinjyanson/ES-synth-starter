@@ -8,7 +8,6 @@ SemaphoreHandle_t sysMutex;
 QueueHandle_t msgInQ ;
 QueueHandle_t msgOutQ;
 SemaphoreHandle_t CAN_TX_Semaphore;
-U8G2_SSD1305_128X32_ADAFRUIT_F_HW_I2C u8g2(U8G2_R0);
 uint8_t prevKnobState = 0;
 
 SystemState sysState = {
@@ -47,11 +46,6 @@ std::bitset<4> readCols() {
 }
 
 void initSystem() {
-    u8g2.begin();
-    u8g2.clearBuffer();
-    u8g2.setFont(u8g2_font_ncenB08_tr);
-    u8g2.drawStr(2, 10, "Keys:");
-
     sysMutex = xSemaphoreCreateMutex();
     msgInQ = xQueueCreate(36, 8);
     msgOutQ = xQueueCreate(36, 8);

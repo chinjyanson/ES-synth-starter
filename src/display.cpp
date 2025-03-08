@@ -3,6 +3,8 @@
 #include <Arduino.h>
 #include <bitset>
 
+U8G2_SSD1305_128X32_ADAFRUIT_F_HW_I2C u8g2(U8G2_R0);
+
 void displayCurrentNote(const std::bitset<12>& keyStates) {
     const char* noteNames[12] = {
         "C ", "C#", "D ", "D#", "E ", "F ",
@@ -22,7 +24,9 @@ void displayCurrentNote(const std::bitset<12>& keyStates) {
 }
 
 void displayUpdateTask(void *pvParameters) {
-    const TickType_t xFrequency = 100 / portTICK_PERIOD_MS;
+    u8g2.begin();
+    delayMicroseconds(10);
+    const TickType_t xFrequency = 30 / portTICK_PERIOD_MS;
     TickType_t xLastWakeTime = xTaskGetTickCount();
     
     while (1) {

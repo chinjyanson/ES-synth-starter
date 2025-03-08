@@ -17,7 +17,6 @@ extern QueueHandle_t msgOutQ;
 extern SemaphoreHandle_t CAN_TX_Semaphore;
 
 extern uint8_t prevKnobState;
-extern U8G2_SSD1305_128X32_ADAFRUIT_F_HW_I2C u8g2;
 
 void initSystem();  // Function to initialize all system components
 void setRow(uint8_t row);

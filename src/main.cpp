@@ -15,8 +15,8 @@
 HardwareTimer sampleTimer(TIM1);
 
 void setup() {
-    // Serial.begin(9600);
-    // Serial.println("Intializing System...");
+    Serial.begin(9600);
+    Serial.println("Intializing System...");
     initSystem();
     initCAN();
 
