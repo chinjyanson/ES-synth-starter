@@ -12,6 +12,7 @@
 #include "display.hpp"
 #include "knob.hpp"
 #include "config.hpp"
+#include "extension.hpp"
 
 HardwareTimer sampleTimer(TIM1);
 
@@ -87,10 +88,11 @@ void setup() {
 
 
     #ifndef DISABLE_THREADS
-    xTaskCreate(scanKeysTask, "scanKeys", 128, NULL, 2, NULL);
+    xTaskCreate(scanKeysTask, "scanKeys", 256, NULL, 2, NULL);
     xTaskCreate(displayUpdateTask, "displayUpdate", 256, NULL, 1, NULL);
     xTaskCreate(CAN_TX_Task, "CAN_TX", 128, NULL, 3, NULL);
     xTaskCreate(CAN_RX_Task, "CAN_RX", 128, NULL, 3, NULL);
+    xTaskCreate(gameTask, "gameTask", 2048, NULL, 2, NULL);
     #endif
 
     vTaskStartScheduler();

@@ -37,33 +37,45 @@ void displayUpdateTask(void *pvParameters) {
 
         xSemaphoreTake(sysState.mutex, portMAX_DELAY);
         std::bitset<12> localKeys = sysState.keyStates;
+        bool isGame = sysState.areAllKnobSPressed;
         int localKnob = sysState.knob3Rotation;
         xSemaphoreGive(sysState.mutex);
-
+        
         u8g2.clearBuffer();
-        u8g2.setFont(u8g2_font_ncenB08_tr);
-        u8g2.drawStr(2, 10, "Keys:");
-        u8g2.setCursor(2, 20);
-        u8g2.print(localKeys.to_ulong(), HEX);
-        displayCurrentNote(localKeys);
-        
-        // Display knob rotation
-        u8g2.setCursor(2, 30);
-        u8g2.print("Knob:");
-        u8g2.print(localKnob);
-        
-        // Display CAN status
-        u8g2.setCursor(70, 10);
-        u8g2.print("TX: ");
-        u8g2.print(canTxSuccess ? "OK" : "Fail");
 
-        u8g2.setCursor(70, 20);
-        u8g2.print("RX: ");
-        u8g2.print(canRxSuccess ? "OK" : "Fail");
+        if (!isGame){
+            u8g2.setFont(u8g2_font_ncenB08_tr);
+            u8g2.drawStr(2, 10, "Keys:");
+            u8g2.setCursor(2, 20);
+            u8g2.print(localKeys.to_ulong(), HEX);
+            displayCurrentNote(localKeys);
+            
+            // Display knob rotation
+            u8g2.setCursor(2, 30);
+            u8g2.print("Knob:");
+            u8g2.print(localKnob);
+            
+            // Display CAN status
+            u8g2.setCursor(70, 10);
+            u8g2.print("TX: ");
+            u8g2.print(canTxSuccess ? "OK" : "Fail");
 
-        u8g2.sendBuffer();
-    
-        digitalToggle(LED_BUILTIN);
+            u8g2.setCursor(70, 20);
+            u8g2.print("RX: ");
+            u8g2.print(canRxSuccess ? "OK" : "Fail");
+
+            u8g2.sendBuffer();
+        
+            digitalToggle(LED_BUILTIN);
+
+        } else {
+            u8g2.setFont(u8g2_font_ncenB08_tr);
+            u8g2.drawStr(4, 10, "Welcome to our");
+            u8g2.drawStr(4, 20, "Hidden Game!");
+            u8g2.sendBuffer();
+
+            digitalToggle(LED_BUILTIN);
+        }
 
         #ifdef TEST_DISPLAY
         break;

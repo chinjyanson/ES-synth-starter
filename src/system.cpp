@@ -17,6 +17,7 @@ bool canRxSuccess = false;
 SystemState sysState = {
     .inputs = 0,
     .mutex = nullptr,  // Will be initialized in initSystem()
+    .areAllKnobSPressed = false,
     .knob3Rotation = 0,
     .keyStates = 0
 };

@@ -25,6 +25,7 @@ std::bitset<4> readCols();
 struct SystemState {
     std::bitset<32> inputs;
     SemaphoreHandle_t mutex;
+    bool areAllKnobSPressed;
     int knob3Rotation;
     std::bitset<12> keyStates;
 };

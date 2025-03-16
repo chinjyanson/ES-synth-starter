@@ -1,6 +1,7 @@
 #include "can_bus.hpp"
 #include "system.hpp"
 #include "audio.hpp"
+#include "config.hpp"
 #include <ES_CAN.h>
 #include <Arduino.h>
 
@@ -100,7 +101,12 @@ void CAN_TX_Task(void *pvParameters) {
 }
 
 void initCAN() {
-    CAN_Init(true);
+    #ifdef SINGLE_PIANO
+        CAN_Init(true);
+    #endif
+    #ifdef DUAL_PIANO
+        CAN_Init(false);
+    #endif
     setCANFilter(0, 0);
     #ifndef DISABLE_CAN_RX_ISR
     CAN_RegisterRX_ISR(CAN_RX_ISR);

@@ -19,6 +19,7 @@ std::array<uint32_t, 12> getArray() {
 }
 
 void sampleISR() {
+    // Serial.print("sample ISR is running");
     static uint32_t phaseAcc = 0;
     uint32_t stepSize = __atomic_load_n(&currentStepSize, __ATOMIC_RELAXED);
     phaseAcc += stepSize;
