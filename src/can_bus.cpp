@@ -61,18 +61,41 @@ void CAN_RX_Task(void *pvParameters) {
     }
 }
 
-
+// NOT SURE HOW TO TEST THIS FUNCTION
 void CAN_TX_Task(void *pvParameters) {
     uint8_t msgOut[8];
+
     while (1) {
-        // Block until a message is available on the transmit queue.
+        #ifdef TEST_CAN_TX
+        // In test mode, simulate a CAN message
+        uint8_t simulatedMessage[8] = {0};  // Simulated CAN message
+        simulatedMessage[0] = 1;  // Example test data
+        simulatedMessage[1] = 2;  // Example test data
+        // Fill in the rest with values you want to test with
+        memcpy(msgOut, simulatedMessage, 8);  // Copy simulated message into msgOut
+        #else
+        // In normal operation, block until a message is available on the transmit queue
         xQueueReceive(msgOutQ, msgOut, portMAX_DELAY);
-        // Wait for an available transmit mailbox.
+        #endif
+
+        // Wait for an available transmit mailbox (or simulate CAN transmission in test mode)
         xSemaphoreTake(CAN_TX_Semaphore, portMAX_DELAY);
-        CAN_TX(0x123, msgOut);
-        if (CAN_TX(0x123, msgOut) == 0) {
-            canTxSuccess = true;  // ✅ Message successfully sent
+
+        #ifdef TEST_CAN_TX
+        // In test mode, simulate the CAN transmission
+        Serial.print("Simulated CAN TX Message: ");
+        for (int i = 0; i < 8; i++) {
+            Serial.print(msgOut[i], HEX);
+            Serial.print(" ");
         }
+        Serial.println();
+        canTxSuccess = true;  // Message successfully "sent" in test mode
+        #else
+        // In normal operation, send the CAN message
+        if (CAN_TX(0x123, msgOut) == 0) {
+            canTxSuccess = true;  // Message successfully sent
+        }
+        #endif
     }
 }
 
