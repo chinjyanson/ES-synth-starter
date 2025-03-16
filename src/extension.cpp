@@ -7,8 +7,12 @@
 #include <random>
 #include <cmath>
 #include <string>
+#include <array>
+#include <cstdlib>
+#include <utility>
+#include <vector>
 
-int getRandomNote() {
+std::pair<int, size_t> getRandomNote() {
     static bool seeded = false;
     if (!seeded) {
         srand(analogRead(A0));  // Seed using an unconnected analog pin for randomness
@@ -16,43 +20,15 @@ int getRandomNote() {
     }
 
     std::array<uint32_t, 12> randomNotes = getArray();
-    if (randomNotes.empty()) return -1;  // Handle edge case
+    // if (randomNotes.empty()) return -1;  // Handle edge case
 
     size_t randomIndex = rand() % randomNotes.size();  // Generate a random index
-    return randomNotes[randomIndex];
+    return {randomNotes[randomIndex], randomIndex};
 }
 
-
-std::string frequencyToNoteName(double frequency) {
-    if (frequency <= 0) return "Invalid";  // Handle invalid cases
-    // Compute number of semitones away from A4 (440 Hz)
-    int n = round(12 * log2(frequency / 440.0));
-    // Determine the note name and octave
-    std::string noteNames[] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
-
-    // A4 is MIDI note 69, so add n to get MIDI note number
-    int midiNote = 69 + n;
-
-    // Get the note name from the MIDI note number
-    std::string note = noteNames[midiNote % 12];
-
-    return note;
-}
-
-int noteNameToIndex(const std::string& note) {
-    // Define the mapping of note names to their indices
-    std::unordered_map<std::string, int> noteMap = {
-        {"C", 0}, {"C#", 1}, {"D", 2}, {"D#", 3}, {"E", 4}, {"F", 5},
-        {"F#", 6}, {"G", 7}, {"G#", 8}, {"A", 9}, {"A#", 10}, {"B", 11}
-    };
-
-    // Check if the note exists in the map
-    auto it = noteMap.find(note);
-    if (it != noteMap.end()) {
-        return it->second;  // Return the index if found
-    } else {
-        return -1;  // Return -1 for an invalid note
-    }
+std::string indexToNoteName(size_t index) {
+    std::vector<std::string> noteNames = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
+    return noteNames[index];
 }
 
 void gameTask(void *pvParameters) {
@@ -64,14 +40,17 @@ void gameTask(void *pvParameters) {
         xSemaphoreGive(sysState.mutex);
         bool firstRun = true;
         uint32_t randomNote = 0;
-        int noteIndex = -1;
+        size_t noteIndex = 13;
+        // int noteIndex = -1;
 
         while (gameActive) {
             if (firstRun) {
                 Serial.println("Game started!");
-                randomNote = getRandomNote();
-                std::string noteName = frequencyToNoteName(randomNote);
-                noteIndex = noteNameToIndex(noteName);
+                std::pair<int, size_t> randomNoteResult = getRandomNote();
+                randomNote = randomNoteResult.first;
+                noteIndex = randomNoteResult.second;
+                // std::string noteName = frequencyToNoteName(randomNote);
+                // noteIndex = noteNameToIndex(noteName);
                 xSemaphoreTake(sysState.mutex, portMAX_DELAY);
                 sysState.gameActiveOverride = true;
                 xSemaphoreGive(sysState.mutex);
@@ -116,7 +95,7 @@ void gameTask(void *pvParameters) {
                     correct_guess = false;
                     Serial.println("Wrong key pressed!");
                 }
-                correct_answer = frequencyToNoteName(randomNote);
+                correct_answer = indexToNoteName(noteIndex);
                 firstRun = true;  // Reset the game for the next round
             }
 
