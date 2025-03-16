@@ -22,12 +22,16 @@ std::bitset<12> scanKeys() {
 }
 
 void scanKeysTask(void *pvParameters) {
+    #ifndef TEST_SCAN_KEYS
     const TickType_t xFrequency = 50 / portTICK_PERIOD_MS;
     TickType_t xLastWakeTime = xTaskGetTickCount();
+    #endif
     static std::bitset<12> previousKeys;  // To detect transitions
 
     while (1) {
+        #ifndef TEST_SCAN_KEYS
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
+        #endif
         std::bitset<12> localKeys = scanKeys();
         decodeKnob();
         
@@ -49,12 +53,16 @@ void scanKeysTask(void *pvParameters) {
             }
         }
         previousKeys = localKeys;
-        
+
         // Update shared key states and step size.
         xSemaphoreTake(sysState.mutex, portMAX_DELAY);
         sysState.keyStates = localKeys;
         xSemaphoreGive(sysState.mutex);
         updateStepSizeFromKeys(localKeys);
+
+        #ifdef TEST_SCAN_KEYS
+        break;
+        #endif
     }
 }
 

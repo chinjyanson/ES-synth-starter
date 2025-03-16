@@ -17,7 +17,7 @@ HardwareTimer sampleTimer(TIM1);
 
 void setup() {
     Serial.begin(9600);
-    Serial.println("Intializing System...");
+    Serial.println("Initializing System...");
     initSystem();
     initCAN();
 
@@ -26,13 +26,47 @@ void setup() {
     sampleTimer.attachInterrupt(sampleISR);
     #endif
     sampleTimer.resume();
-    
+
+    // Test display update timing
+    #ifdef TEST_DISPLAY
+    float startTime = micros();  // Start timing
+    Serial.println("Testing Display Update Time...");
+    for (int iter = 0; iter < 32; iter++) {
+        displayUpdateTask(NULL);  // Call the display update task to measure its execution time
+    }
+    float final_time = micros() - startTime;  // Calculate total time
+    Serial.print("Worst Case Time for Display Update (ms): ");
+    Serial.println(final_time / 32000);  // Print the average time per update
+    #endif
+
+    #ifdef TEST_SCAN_KEYS
+    float startTime = micros();
+    for (int iter = 0; iter < 32; iter++) {
+    scanKeysTask(NULL);
+    }
+    float final_time = micros() - startTime;
+    Serial.print("Worst Case Time for ScanKeys (ms): ");
+    Serial.println(final_time/32000);
+    #endif
+
+    #ifdef TEST_ISR
+    float startTime = micros();
+    for (int iter = 0; iter < 32; iter++) {
+      sampleISR();
+    }
+    float final_time = micros() - startTime;
+    Serial.print("Worst Case Time for ISR (ms): ");
+    Serial.println(final_time/32000);
+    while(1);
+    #endif
+
     #ifndef DISABLE_THREADS
     xTaskCreate(scanKeysTask, "scanKeys", 128, NULL, 2, NULL);
     xTaskCreate(displayUpdateTask, "displayUpdate", 256, NULL, 1, NULL);
     xTaskCreate(CAN_TX_Task, "CAN_TX", 128, NULL, 3, NULL);
     xTaskCreate(CAN_RX_Task, "CAN_RX", 128, NULL, 3, NULL);
     #endif
+
     vTaskStartScheduler();
 }
 

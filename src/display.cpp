@@ -1,3 +1,4 @@
+#include "config.hpp"
 #include "display.hpp"
 #include "system.hpp"
 #include <Arduino.h>
@@ -30,7 +31,9 @@ void displayUpdateTask(void *pvParameters) {
     TickType_t xLastWakeTime = xTaskGetTickCount();
     
     while (1) {
+        #ifndef TEST_DISPLAY
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
+        #endif
 
         xSemaphoreTake(sysState.mutex, portMAX_DELAY);
         std::bitset<12> localKeys = sysState.keyStates;
@@ -61,5 +64,9 @@ void displayUpdateTask(void *pvParameters) {
         u8g2.sendBuffer();
     
         digitalToggle(LED_BUILTIN);
+
+        #ifdef TEST_DISPLAY
+        break;
+        #endif
     }
 }
