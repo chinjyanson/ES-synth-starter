@@ -6,6 +6,8 @@
 // #define TEST_DISPLAY
 // #define TEST_SCAN_KEYS
 // #define TEST_ISR
+// #define TEST_CAN_TX
+// #define TEST_CAN_RX
 
 // Uncomment to disable the feature
 // #define DISABLE_THREADS  // Define it here so it's included in all files

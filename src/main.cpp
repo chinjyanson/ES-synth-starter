@@ -37,6 +37,7 @@ void setup() {
     float final_time = micros() - startTime;  // Calculate total time
     Serial.print("Worst Case Time for Display Update (ms): ");
     Serial.println(final_time / 32000);  // Print the average time per update
+    while(1);
     #endif
 
     #ifdef TEST_SCAN_KEYS
@@ -47,6 +48,7 @@ void setup() {
     float final_time = micros() - startTime;
     Serial.print("Worst Case Time for ScanKeys (ms): ");
     Serial.println(final_time/32000);
+    while(1);
     #endif
 
     #ifdef TEST_ISR
@@ -59,6 +61,30 @@ void setup() {
     Serial.println(final_time/32000);
     while(1);
     #endif
+
+    #ifdef TEST_CAN_TX
+    float startTime = micros();
+    for (int iter = 0; iter < 32; iter++) {
+      CAN_TX_Task(NULL);
+    }
+    float final_time = micros() - startTime;
+    Serial.print("Worst Case Time for CAN_TX (ms): ");
+    Serial.println(final_time/32000);
+    while(1);
+    #endif
+
+    #ifdef TEST_CAN_RX
+    float startTime = micros();
+    for (int iter = 0; iter < 32; iter++) {
+      CAN_RX_Task(NULL);
+    }
+    float final_time = micros() - startTime;
+    Serial.print("Worst Case Time for CAN_RX (ms): ");
+    Serial.println(final_time/32000);
+    while(1);
+    #endif
+
+
 
     #ifndef DISABLE_THREADS
     xTaskCreate(scanKeysTask, "scanKeys", 128, NULL, 2, NULL);

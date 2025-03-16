@@ -18,6 +18,12 @@ std::bitset<12> scanKeys() {
             allKeys[row * 4 + col] = cols[col];
         }
     }
+    // In worst-case testing mode, generate a press for every key (regardless of physical state)
+    #ifdef TEST_SCAN_KEYS
+    for (int i = 0; i < 12; i++) {
+        allKeys[i] = 1;  // Force all keys to be "pressed" in test mode
+    }
+    #endif
     return allKeys;
 }
 

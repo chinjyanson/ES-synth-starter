@@ -24,8 +24,22 @@ void CAN_TX_ISR(void) {
 void CAN_RX_Task(void *pvParameters) {
     uint8_t msgIn[8];
     uint32_t id;
+    
+    #ifdef TEST_CAN_RX
+    // In test mode, simulate receiving CAN messages
+    uint8_t simulatedMessage[8] = {0};  // Simulated message (can be filled with test data)
+    simulatedMessage[0] = 1;  // Example test data
+    simulatedMessage[1] = 2;  // Example test data
+    // You can fill the rest with any values to simulate a message.
+    memcpy(msgIn, simulatedMessage, 8);  // Copy the simulated message
+    #endif
+    
     while (1) {
+        #ifndef TEST_CAN_RX
+        // In normal operation, receive a message from the CAN queue
         xQueueReceive(msgInQ, msgIn, portMAX_DELAY);
+        #endif
+        
         noInterrupts();
         memcpy(globalRXMessage, msgIn, 8);
         interrupts();
@@ -34,8 +48,19 @@ void CAN_RX_Task(void *pvParameters) {
         canRxSuccess = true;
         stepSizes = getArray();
         xSemaphoreGive(sysMutex);
+
+        #ifdef TEST_CAN_RX
+        // Optionally, print or log the message if in test mode
+        Serial.print("Simulated CAN RX Message: ");
+        for (int i = 0; i < 8; i++) {
+            Serial.print(simulatedMessage[i], HEX);
+            Serial.print(" ");
+        }
+        Serial.println();
+        #endif
     }
 }
+
 
 void CAN_TX_Task(void *pvParameters) {
     uint8_t msgOut[8];
