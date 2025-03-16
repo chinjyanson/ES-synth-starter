@@ -2,6 +2,7 @@
 #include <Arduino.h>
 #include "audio.hpp"
 #include "system.hpp"
+#include "display.hpp"
 #include <STM32FreeRTOS.h>
 #include <random>
 #include <cmath>
@@ -76,16 +77,17 @@ void gameTask(void *pvParameters) {
                 xSemaphoreGive(sysState.mutex);
                 firstRun = false;
             }
-
+            playing_music = true;
             // **Play sound for 3 seconds**
             int stepSize = randomNote;  // Set the step size to generate the sound
             __atomic_store_n(&currentStepSize, stepSize, __ATOMIC_RELAXED);  // Play the sound
 
             // Wait for 3 seconds while the sound plays
-            vTaskDelay(pdMS_TO_TICKS(3000));  // 3 seconds
+            vTaskDelay(pdMS_TO_TICKS(2000));  // 2 seconds
 
             // **Stop sound after 3 seconds**
             __atomic_store_n(&currentStepSize, 0, __ATOMIC_RELAXED);  // Stop the sound
+            playing_music = false;
 
             // **Allow the user to guess**
             // Temporarily disable the gameActiveOverride flag to allow key input to produce sound
@@ -96,6 +98,7 @@ void gameTask(void *pvParameters) {
 
             while (userKeys.none() and gameActive) {  // .none() returns true if all bits are 0 (i.e., no key is pressed)
                 Serial.println("Waiting for key press...");
+                waiting_for_user = true;
                 xSemaphoreTake(sysState.mutex, portMAX_DELAY);
                 userKeys = sysState.keyStates;  // Refresh the key states
                 gameActive = sysState.areAllKnobSPressed;  // Check if the game should continue or exit
@@ -105,17 +108,21 @@ void gameTask(void *pvParameters) {
             }
 
             if (noteIndex >= 0 && noteIndex < 12 and gameActive) {  // Ensure valid index
+                waiting_for_user = false;
                 if (userKeys[noteIndex] == 1) {  // Check if the key is pressed
+                    correct_guess = true;
                     Serial.println("Correct key pressed!");
                 } else {
+                    correct_guess = false;
                     Serial.println("Wrong key pressed!");
                 }
+                correct_answer = frequencyToNoteName(randomNote);
                 firstRun = true;  // Reset the game for the next round
             }
 
             // **Prepare for the next round**
             Serial.println("Next round starting...");
-            vTaskDelay(pdMS_TO_TICKS(2000));  // Allow a small delay before the next round starts
+            vTaskDelay(pdMS_TO_TICKS(3000));  // Allow a small delay before the next round starts
 
              // **Check if the user pressed all knobs to exit game**
              xSemaphoreTake(sysState.mutex, portMAX_DELAY);

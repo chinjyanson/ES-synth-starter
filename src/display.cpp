@@ -3,8 +3,14 @@
 #include "system.hpp"
 #include <Arduino.h>
 #include <bitset>
+#include <string>
 
 U8G2_SSD1305_128X32_ADAFRUIT_F_HW_I2C u8g2(U8G2_R0);
+
+bool waiting_for_user = false;
+bool playing_music = false;
+bool correct_guess = false;
+std::string correct_answer = "";
 
 void displayCurrentNote(const std::bitset<12>& keyStates) {
     const char* noteNames[12] = {
@@ -39,6 +45,7 @@ void displayUpdateTask(void *pvParameters) {
         std::bitset<12> localKeys = sysState.keyStates;
         bool isGame = sysState.areAllKnobSPressed;
         int localKnob = sysState.knob3Rotation;
+        bool gameOverride = sysState.gameActiveOverride;
         xSemaphoreGive(sysState.mutex);
         
         u8g2.clearBuffer();
@@ -68,10 +75,47 @@ void displayUpdateTask(void *pvParameters) {
         
             digitalToggle(LED_BUILTIN);
 
-        } else {
+        } else if (!isGame) {
             u8g2.setFont(u8g2_font_ncenB08_tr);
             u8g2.drawStr(4, 10, "Welcome to our");
             u8g2.drawStr(4, 20, "Hidden Game!");
+            u8g2.sendBuffer();
+
+            digitalToggle(LED_BUILTIN);
+        } else if (waiting_for_user){
+            u8g2.setFont(u8g2_font_ncenB08_tr);
+            u8g2.drawStr(4, 10, "Please make ");
+            u8g2.drawStr(4, 20, "your guess");
+            u8g2.sendBuffer();
+
+            digitalToggle(LED_BUILTIN);
+        } else if (playing_music){
+            u8g2.clearBuffer();
+            u8g2.setFont(u8g2_font_ncenB08_tr);
+            u8g2.drawStr(4, 10, "Playing music");
+            u8g2.sendBuffer();
+
+            digitalToggle(LED_BUILTIN);
+        } else if (correct_guess) {
+            u8g2.clearBuffer();
+            u8g2.setFont(u8g2_font_ncenB08_tr);
+            u8g2.drawStr(4, 10, "Correct Guess");
+            u8g2.sendBuffer();
+
+            digitalToggle(LED_BUILTIN);
+        } else if (!correct_guess){
+            u8g2.clearBuffer();
+            u8g2.setFont(u8g2_font_ncenB08_tr);
+            u8g2.drawStr(4, 10, "Wrong Guess");
+            u8g2.drawStr(4, 20, "Correct Guess was");
+            u8g2.drawStr(4, 30, correct_answer.c_str());
+            u8g2.sendBuffer();
+
+            digitalToggle(LED_BUILTIN);
+        } else {
+            u8g2.clearBuffer();
+            u8g2.setFont(u8g2_font_ncenB08_tr);
+            u8g2.drawStr(4, 10, "how are you here");
             u8g2.sendBuffer();
 
             digitalToggle(LED_BUILTIN);
