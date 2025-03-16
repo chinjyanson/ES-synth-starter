@@ -45,7 +45,9 @@
     "cinttypes": "cpp",
     "typeinfo": "cpp",
     "xutility": "cpp",
-    "cstring": "cpp"
+    "cstring": "cpp",
+    "iostream": "cpp",
+    "istream": "cpp"
   },
   "C_Cpp_Runner.cCompilerPath": "gcc",
   "C_Cpp_Runner.cppCompilerPath": "g++",

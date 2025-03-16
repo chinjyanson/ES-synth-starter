@@ -74,6 +74,15 @@ void scanKeysTask(void *pvParameters) {
 
 void updateStepSizeFromKeys(const std::bitset<12>& keyStates) {
     uint32_t localStepSize = 0;
+
+    xSemaphoreTake(sysState.mutex, portMAX_DELAY);
+    bool gameOverride = sysState.gameActiveOverride;  // Check if game is active
+    xSemaphoreGive(sysState.mutex);
+
+    if (gameOverride) {
+        return;
+    }
+
     xSemaphoreTake(sysMutex, portMAX_DELAY);
     for (int i = 0; i < 12; i++) {
         if (keyStates[i]) {
@@ -81,5 +90,6 @@ void updateStepSizeFromKeys(const std::bitset<12>& keyStates) {
         }
     }
     xSemaphoreGive(sysMutex);
+
     __atomic_store_n(&currentStepSize, localStepSize, __ATOMIC_RELAXED);
 }

@@ -26,6 +26,7 @@ struct SystemState {
     std::bitset<32> inputs;
     SemaphoreHandle_t mutex;
     bool areAllKnobSPressed;
+    bool gameActiveOverride = false;
     int knob3Rotation;
     std::bitset<12> keyStates;
 };
