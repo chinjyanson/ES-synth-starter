@@ -31,12 +31,10 @@ std::string frequencyToNoteName(double frequency) {
 
     // A4 is MIDI note 69, so add n to get MIDI note number
     int midiNote = 69 + n;
-    // // Octave number (A4 is octave 4, MIDI note 69)
-    // int octave = (midiNote / 12) - 1;
-    // Get note name (mod 12)
+
+    // Get the note name from the MIDI note number
     std::string note = noteNames[midiNote % 12];
 
-    // Return formatted note name
     return note;
 }
 
@@ -56,7 +54,6 @@ int noteNameToIndex(const std::string& note) {
     }
 }
 
-
 void gameTask(void *pvParameters) {
     std::array<uint32_t, 12> randomNotes = getArray();
 
@@ -67,14 +64,8 @@ void gameTask(void *pvParameters) {
         bool firstRun = true;
         uint32_t randomNote = 0;
         int noteIndex = -1;
-        // Serial.print("Current Key States: ");
-        // for (int i = 0; i < 12; i++) {
-        //     Serial.print(localKeys[i]);  // Print each bit (0 or 1)
-        //     Serial.print(" ");  // Add space for readability
-        // }
-        // Serial.println();  // Newline for better formatting
 
-        while (gameActive) {  // Run only when game is active
+        while (gameActive) {
             if (firstRun) {
                 Serial.println("Game started!");
                 randomNote = getRandomNote();
@@ -86,35 +77,54 @@ void gameTask(void *pvParameters) {
                 firstRun = false;
             }
 
+            // **Play sound for 3 seconds**
+            int stepSize = randomNote;  // Set the step size to generate the sound
+            __atomic_store_n(&currentStepSize, stepSize, __ATOMIC_RELAXED);  // Play the sound
+
+            // Wait for 3 seconds while the sound plays
+            vTaskDelay(pdMS_TO_TICKS(3000));  // 3 seconds
+
+            // **Stop sound after 3 seconds**
+            __atomic_store_n(&currentStepSize, 0, __ATOMIC_RELAXED);  // Stop the sound
+
+            // **Allow the user to guess**
+            // Temporarily disable the gameActiveOverride flag to allow key input to produce sound
             xSemaphoreTake(sysState.mutex, portMAX_DELAY);
-            std::bitset<12> localKeys = sysState.keyStates;
+            sysState.gameActiveOverride = false;  // Re-enable key scanning and sound production
+            std::bitset<12> userKeys = sysState.keyStates;  // Get the current key states
             xSemaphoreGive(sysState.mutex);
 
-            if (noteIndex >= 0 && noteIndex < 12) {  // Ensure valid index
-                if (localKeys[noteIndex] == 1) {  // Check if the key is pressed
+            while (userKeys.none() and gameActive) {  // .none() returns true if all bits are 0 (i.e., no key is pressed)
+                Serial.println("Waiting for key press...");
+                xSemaphoreTake(sysState.mutex, portMAX_DELAY);
+                userKeys = sysState.keyStates;  // Refresh the key states
+                gameActive = sysState.areAllKnobSPressed;  // Check if the game should continue or exit
+                xSemaphoreGive(sysState.mutex);
+
+                vTaskDelay(pdMS_TO_TICKS(10));  // Short delay to prevent the loop from hogging the CPU
+            }
+
+            if (noteIndex >= 0 && noteIndex < 12 and gameActive) {  // Ensure valid index
+                if (userKeys[noteIndex] == 1) {  // Check if the key is pressed
                     Serial.println("Correct key pressed!");
                 } else {
-                    Serial.println("Wrong key or no key pressed.");
+                    Serial.println("Wrong key pressed!");
                 }
+                firstRun = true;  // Reset the game for the next round
             }
 
-            int stepSize = randomNote;  // Placeholder step size
-            __atomic_store_n(&currentStepSize, stepSize, __ATOMIC_RELAXED);
+            // **Prepare for the next round**
+            Serial.println("Next round starting...");
+            vTaskDelay(pdMS_TO_TICKS(2000));  // Allow a small delay before the next round starts
 
-            vTaskDelay(pdMS_TO_TICKS(100));  // Allow other tasks to run
-            // __atomic_store_n(&currentStepSize, 0, __ATOMIC_RELAXED);  // Stop the sound
-
-            // **Re-check if game is still active**
-            xSemaphoreTake(sysState.mutex, portMAX_DELAY);
-            gameActive = sysState.areAllKnobSPressed;  // Update the game state
-            if (!gameActive) {
-                sysState.gameActiveOverride = false;  // Re-enable step size updates from scanKeysTask
-                __atomic_store_n(&currentStepSize, 0, __ATOMIC_RELAXED);  // Stop sound after game ends
-            }
-            xSemaphoreGive(sysState.mutex);
+             // **Check if the user pressed all knobs to exit game**
+             xSemaphoreTake(sysState.mutex, portMAX_DELAY);
+             gameActive = sysState.areAllKnobSPressed;  // Check if the game should continue or exit
+             xSemaphoreGive(sysState.mutex);
         }
 
+        // **Exit game if knobs are pressed**
+        // Serial.println("Game exited, returning to other mode.");
         vTaskDelay(pdMS_TO_TICKS(50));  // Prevent CPU overuse
     }
 }
-
