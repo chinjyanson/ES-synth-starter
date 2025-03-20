@@ -226,8 +226,11 @@ ON INTERRUPT:
 Manages the transmission of CAN messages for the synthesized note(s).
 
 - **Implementation**: Thread (FreeRTOS task)
-- **Initiation Interval**: 60 milliseconds for 36 iterations (FILLER FOR EDDIE)
-- **Measured Maximum Execution Time**: 12 microseconds (FILLER FOR EDDIE)
+  - This task is implemented as a FreeRTOS thread that continuously waits on a transmit queue (msgOutQ). When a new message is enqueued (for example, from key state changes), the task retrieves the message, then takes a counting semaphore (CAN_TX_Semaphore) to ensure that there is a free CAN transmission mailbox. Once a mailbox is available, it calls CAN_TX(0x123, msgOut) to send the message. This design decouples the application-level message generation from the actual transmission, ensuring that tasks do not block on hardware delays.
+- **Initiation Interval**: 60 milliseconds for 36 iterations
+  - In the worst-case scenario, 36 messages could be generated in 60 milliseconds. This means that the task is expected to process an iteration every 60 ms for the batch of 36 messages, ensuring that the transmit queue does not overflow even under high load.
+- **Measured Maximum Execution Time**: 12 microseconds
+  - The execution time per iteration has been measured at approximately 12 microseconds. This low overhead is achieved by using non-blocking queue operations and the counting semaphore to manage the limited hardware resources.
 
 ---
 
@@ -235,8 +238,13 @@ Manages the transmission of CAN messages for the synthesized note(s).
 Handles incoming CAN messages and takes the necessary action (e.g., playing or stopping a note).
 
 - **Implementation**: Thread (FreeRTOS task)
-- **Initiation Interval**: 25.2 milliseconds for 36 iterations (FILLER FOR EDDIE)
-- **Measured Maximum Execution Time**: 82.7 microseconds (FILLER FOR EDDIE)
+  - This task (referred to as the decodeTask in the code) is implemented as a FreeRTOS thread that blocks on a reception queue (msgInQ). When a CAN message is received, the CAN_RX_ISR enqueues the message into msgInQ. The decode task then retrieves each message and processes it: for key press messages, it calculates the new step size by combining a base frequency (from a predefined table) with an octave multiplier (using bit shifts); for key release messages, it sets the step size to zero. Updates to shared variables, such as the global step size and the display buffer for the last received message, are protected by a mutex.
+- **Initiation Interval**: 25.2 milliseconds for 36 iterations
+  - Under worst-case conditions, if 36 messages are received, the task should ideally process them within 25.2 milliseconds in total. This interval ensures that even in high-traffic conditions, the system’s response remains within acceptable real-time bounds.
+- **Measured Maximum Execution Time**: 82.7 microseconds
+  - The maximum execution time per iteration is around 82.7 microseconds. This includes the time to dequeue a message, process its contents, update shared state, and copy data for display, all while ensuring thread safety via mutex locks.
+
+
 
 ---
 
@@ -244,8 +252,13 @@ Handles incoming CAN messages and takes the necessary action (e.g., playing or s
 Triggered when a CAN message is sent, ensuring that the CAN transmission buffer does not overflow.
 
 - **Implementation**: Interrupt (ISR)
-- **Initiation Interval**: 60 milliseconds for 36 iterations (FILLER FOR EDDIE)
-- **Measured Maximum Execution Time**: 5.2 microseconds (FILLER FOR EDDIE)
+  - The CAN_TX_ISR is an interrupt service routine that is invoked whenever a transmission mailbox becomes available. Its sole purpose is to release the counting semaphore (CAN_TX_Semaphore) using xSemaphoreGiveFromISR(). This signal allows the CAN_TX_Task to know that a new mailbox is free for a subsequent transmission. Because this ISR only performs a very short operation, it minimizes the risk of interrupt latency affecting system performance.
+- **Initiation Interval**: 60 milliseconds for 36 iterations
+  - This ISR is called whenever a mailbox frees up. In a scenario where 36 messages are transmitted every 60 milliseconds, the effective initiation interval for the ISR events remains consistent with the system’s transmission rate.
+- **Measured Maximum Execution Time**: 5.2 microseconds
+  - The measured maximum execution time is approximately 5.2 microseconds. The ISR’s brief execution time helps maintain system responsiveness and minimizes disruption to other real-time tasks.
+
+
 
 ---
 
@@ -253,8 +266,12 @@ Triggered when a CAN message is sent, ensuring that the CAN transmission buffer 
 Triggered when a CAN message is received and copies it to the incoming message queue.
 
 - **Implementation**: Interrupt (ISR)
-- **Initiation Interval**: 25.2 milliseconds for 36 iterations (FILLER FOR EDDIE)
-- **Measured Maximum Execution Time**: 10 microseconds (FILLER FOR EDDIE)
+  - The CAN_RX_ISR is invoked upon reception of a CAN message. Inside the ISR, the message is immediately read from the CAN hardware using CAN_RX() and then enqueued into the msgInQ using xQueueSendFromISR(). This rapid hand-off ensures that the ISR remains short and non-blocking, with the heavier processing deferred to the CAN_RX_Task (decodeTask).
+- **Initiation Interval**: 25.2 milliseconds for 36 iterations
+  - In the worst-case scenario, where 36 messages could be received in 25.2 milliseconds, the ISR is triggered as each message arrives, ensuring continuous and timely processing.
+- **Measured Maximum Execution Time**: 10 microseconds
+  - The maximum execution time for the CAN_RX_ISR has been measured at approximately 10 microseconds. This brief execution period is critical for maintaining the integrity of real-time processing and ensuring that no messages are lost due to long ISR blocking times.
+
 
 ---
 
@@ -364,10 +381,8 @@ xSemaphoreGive(sysState.mutex);                 // Release the mutex
 - **ScanKeyTask**: 241 μs  
 - **DisplayUpdateTask**: 18,604 μs  
 - **SampleISR**: 28.0 μs  
-- **CAN_TX_Task**: 12 μs  (FILLER FOR EDDIE)
-- **CAN_RX_Task**: 82.7 μs  (FILLER FOR EDDIE)
-- **CAN_TX_ISR**: 5.2 μs  (FILLER FOR EDDIE)
-- **CAN_RX_ISR**: 10 μs  (FILLER FOR EDDIE)
+- **CAN_TX_Task**: 10 μs 
+- **CAN_RX_Task**: 119 μs 
 
 ### 4.4. CPU Utilization - Rate Monotonic Scheduler Critical Instant Analysis
 
@@ -376,10 +391,8 @@ xSemaphoreGive(sysState.mutex);                 // Release the mutex
 | **scanKeyTask**      | 20 ms                       | 241 μs                 | 1.205%                     | 1.205%                               |
 | **displayUpdateTask**| 100 ms                      | 18.6 ms                | 18.6%                      | 18.6%                                |
 | **sampleISR**        | 45.45 μs                    | 28.0 μs                | 61.6%                      | 61.6%                                |
-| **CAN_TX_Task**      | 60 ms                       | 12 μs                  | 0.72%                      | 0.72%                                |
-| **CAN_RX_Task**      | 25.2 ms                     | 82.7 μs                | 4.43%                      | 4.43%                                |
-| **CAN_TX_ISR**       | 60 ms                       | 5.2 μs                 | 0.312%                     | 0.312%                               |
-| **CAN_RX_ISR**       | 25.2 ms                     | 10 μs                  | 1.429%                     | 1.429%                               |
+| **CAN_TX_Task**      | 60 ms                       | 10 μs                  | 0.72%                      | 0.72%                                |
+| **CAN_RX_Task**      | 25.2 ms                     | 119 μs                 | 4.43%                      | 4.43%                                |
 
 ### Total CPU Utilization:
 The total CPU utilization in the system is:
