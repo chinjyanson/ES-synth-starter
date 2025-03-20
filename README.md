@@ -69,8 +69,8 @@ The `ScanKeyTask` is a **thread** responsible for scanning the 12-key keyboard, 
 
 #### **Task Overview**
 - **Implementation**: Thread (FreeRTOS task)
-- **Initiation Interval**: 20 milliseconds (50 Hz)
-- **Max Execution Time**: 241 microseconds (all 12 keys pressed)
+- **Initiation Interval**: 20 milliseconds (50 Hz) (NOT SURE!!!!)
+- **Max Execution Time**: 237 microseconds (all 12 keys pressed)
 
 #### **Key Scanning Process**
 The `scanKeys()` function scans a 3x4 matrix by setting each row active and reading the columns to detect key presses. The results are stored in a 12-bit bitset.
@@ -132,12 +132,46 @@ void updateStepSizeFromKeys(const std::bitset<12>& keyStates) {
 ---
 
 ### 3.2. DisplayUpdateTask (Thread)
-Updates the OLED screen with information on the synthesizer’s status, including the current waveform, volume, and octave settings.
 
-- **Implementation**: Thread (FreeRTOS task)
-- **Initiation Interval**: 100 milliseconds
-- **Measured Maximum Execution Time**: 18,604 microseconds (all 12 keys pressed)
+The `DisplayUpdateTask` is a **FreeRTOS thread** responsible for updating the OLED display with real-time system information, including pressed keys, knob positions, and game-related messages.  
 
+#### **Task Overview**  
+- **Implementation**: Thread (FreeRTOS task)  
+- **Initiation Interval**: 100 milliseconds  
+- **Measured Maximum Execution Time**: 24,156 microseconds (all 12 keys pressed)  
+
+#### **How It Works**  
+
+1. **Regular Updates with Timing Control**  
+   - Runs **every 100 milliseconds**, ensuring a smooth and responsive display.  
+   - Uses FreeRTOS **task scheduling** to prevent excessive CPU usage.  
+
+2. **System State Retrieval**  
+   - Locks **shared system variables** (key states, knob rotation, game mode) with a mutex to prevent data corruption.  
+   - Reads the state of pressed keys and **displays them in hex format** alongside the corresponding musical note.  
+   - Checks the knob’s rotation value to show volume settings.  
+   - Displays **CAN bus status** (TX/RX communication success/failure).  
+
+3. **OLED Screen Updates**  
+   - Clears the screen before each update to prevent overlapping text.  
+   - Uses **buffered rendering** (`clearBuffer()` and `sendBuffer()`) to minimize flickering.  
+
+4. **Game Mode Integration**  
+   - If the synthesizer is in **game mode**, the display shows different messages:  
+     - **Waiting for user input** → Prompts the user to make a guess.  
+     - **Playing music** → Indicates that music is currently being played.  
+     - **Correct/Wrong guess** → Provides feedback and reveals the correct answer if needed.  
+
+5. **Debugging & System Feedback**  
+   - **Toggles the built-in LED** to signal each update cycle.  
+   - Includes a **fail-safe message** ("how are you here") for unexpected states.  
+   - Supports a **test mode (`TEST_DISPLAY`)** to allow manual debugging.  
+
+#### **Key Design Considerations**  
+
+- **Optimized Execution Time**: 24.1 ms max, ensuring no delay in audio processing.  
+- **Efficient Resource Management**: Mutex locks prevent conflicts, and buffered rendering reduces CPU load.  
+- **Flexible Display Handling**: Can switch between normal synthesizer mode and game mode dynamically.  
 ---
 
 ### 3.3. SampleISR (Interrupt)
@@ -146,10 +180,8 @@ The `SampleISR` is an **interrupt** responsible for generating the audio output 
 
 #### **Task Overview**  
 - **Implementation**: Interrupt (ISR)  
-- **Initiation Interval**: 45.45 microseconds  
-- **Measured Maximum Execution Time**: 28.0 microseconds (all 12 keys pressed)  
-
----
+- **Initiation Interval**: 50.2 microseconds  
+- **Measured Maximum Execution Time**: 30.6 microseconds (all 12 keys pressed)  
 
 #### **Pseudocode Explanation**  
 
@@ -162,8 +194,6 @@ ON INTERRUPT:
     - Scale the waveform amplitude based on knob rotation
     - Output the final waveform signal to the DAC
 ```
-
----
 
 #### **SampleISR Logic Breakdown**  
 
@@ -183,9 +213,7 @@ ON INTERRUPT:
    - The final waveform value is **offset by 128** to fit the DAC’s range (0–255).  
    - Uses `analogWrite()` to send the processed waveform to the output pin.  
 
----
-
-### **Key Features and Considerations**  
+#### **Key Features and Considerations**  
 
 - **Atomic Operations**  
   - Ensures thread safety when reading `currentStepSize` and `knob3Rotation`.  
@@ -199,50 +227,48 @@ ON INTERRUPT:
 
 ---
 
-## 3.4. CAN_TX_Task (Thread)
+### 3.4. CAN_TX_Task (Thread)
 Manages the transmission of CAN messages for the synthesized note(s).
 
 - **Implementation**: Thread (FreeRTOS task)
-- **Initiation Interval**: 60 milliseconds for 36 iterations
-- **Measured Maximum Execution Time**: 12 microseconds
+- **Initiation Interval**: 60 milliseconds for 36 iterations (FILLER FOR EDDIE)
+- **Measured Maximum Execution Time**: 12 microseconds (FILLER FOR EDDIE)
 
 ---
 
-## 3.5. CAN_RX_Task (Thread)
+### 3.5. CAN_RX_Task (Thread)
 Handles incoming CAN messages and takes the necessary action (e.g., playing or stopping a note).
 
 - **Implementation**: Thread (FreeRTOS task)
-- **Initiation Interval**: 25.2 milliseconds for 36 iterations
-- **Measured Maximum Execution Time**: 82.7 microseconds
+- **Initiation Interval**: 25.2 milliseconds for 36 iterations (FILLER FOR EDDIE)
+- **Measured Maximum Execution Time**: 82.7 microseconds (FILLER FOR EDDIE)
 
 ---
 
-## 3.6. CAN_TX_ISR (Interrupt)
+### 3.6. CAN_TX_ISR (Interrupt)
 Triggered when a CAN message is sent, ensuring that the CAN transmission buffer does not overflow.
 
 - **Implementation**: Interrupt (ISR)
-- **Initiation Interval**: 60 milliseconds for 36 iterations
-- **Measured Maximum Execution Time**: 5.2 microseconds
+- **Initiation Interval**: 60 milliseconds for 36 iterations (FILLER FOR EDDIE)
+- **Measured Maximum Execution Time**: 5.2 microseconds (FILLER FOR EDDIE)
 
 ---
 
-## 3.7. CAN_RX_ISR (Interrupt)
+### 3.7. CAN_RX_ISR (Interrupt)
 Triggered when a CAN message is received and copies it to the incoming message queue.
 
 - **Implementation**: Interrupt (ISR)
-- **Initiation Interval**: 25.2 milliseconds for 36 iterations
-- **Measured Maximum Execution Time**: 10 microseconds
+- **Initiation Interval**: 25.2 milliseconds for 36 iterations (FILLER FOR EDDIE)
+- **Measured Maximum Execution Time**: 10 microseconds (FILLER FOR EDDIE)
 
 ---
 
-### **3.8. GameTask (Thread)**  
+### 3.8. GameTask (Thread)
 
 The `GameTask` is a **thread** that manages the note recognition game. It plays a randomly selected note and waits for the user to press the correct key before proceeding to the next round.  
 
 #### **Task Overview**  
-- **Implementation**: Thread (FreeRTOS task)  
-- **Initiation Interval**: 25.2 milliseconds  
-- **Measured Max Execution Time**: 10 microseconds  
+- **Implementation**: Thread (FreeRTOS task)
 
 #### **Pseudocode Explanation**  
 
@@ -345,10 +371,10 @@ xSemaphoreGive(sysState.mutex);                 // Release the mutex
 - **ScanKeyTask**: 241 μs  
 - **DisplayUpdateTask**: 18,604 μs  
 - **SampleISR**: 28.0 μs  
-- **CAN_TX_Task**: 12 μs  
-- **CAN_RX_Task**: 82.7 μs  
-- **CAN_TX_ISR**: 5.2 μs  
-- **CAN_RX_ISR**: 10 μs  
+- **CAN_TX_Task**: 12 μs  (FILLER FOR EDDIE)
+- **CAN_RX_Task**: 82.7 μs  (FILLER FOR EDDIE)
+- **CAN_TX_ISR**: 5.2 μs  (FILLER FOR EDDIE)
+- **CAN_RX_ISR**: 10 μs  (FILLER FOR EDDIE)
 
 ### 4.4. CPU Utilization - Rate Monotonic Scheduler Critical Instant Analysis
 
