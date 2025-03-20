@@ -17,8 +17,8 @@
 HardwareTimer sampleTimer(TIM1);
 
 void setup() {
-    Serial.begin(9600);
-    Serial.println("Initializing System...");
+    Serial.begin(115200);
+    Serial.println("Initialising System...");
     initSystem();
     initCAN();
 
@@ -63,26 +63,20 @@ void setup() {
     while(1);
     #endif
 
+    #ifdef TEST_CAN_TX_ISR
+    CAN_TX_ISR();
+    #endif
+
+    #ifdef TEST_CAN_RX_ISR
+    CAN_RX_ISR();
+    #endif
+
     #ifdef TEST_CAN_TX
-    float startTime = micros();
-    for (int iter = 0; iter < 32; iter++) {
-      CAN_TX_Task(NULL);
-    }
-    float final_time = micros() - startTime;
-    Serial.print("Worst Case Time for CAN_TX (ms): ");
-    Serial.println(final_time/32000);
-    while(1);
+    CAN_TX_Task(NULL);
     #endif
 
     #ifdef TEST_CAN_RX
-    float startTime = micros();
-    for (int iter = 0; iter < 32; iter++) {
-      CAN_RX_Task(NULL);
-    }
-    float final_time = micros() - startTime;
-    Serial.print("Worst Case Time for CAN_RX (ms): ");
-    Serial.println(final_time/32000);
-    while(1);
+    CAN_RX_Task(NULL);
     #endif
 
 

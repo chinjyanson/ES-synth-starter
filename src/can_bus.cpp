@@ -5,21 +5,59 @@
 #include <ES_CAN.h>
 #include <Arduino.h>
 
+int counter = 0;
+float accumulator = 0;
+
+
 // CAN RX ISR: Reads incoming CAN message and enqueues it.
 void CAN_RX_ISR(void) {
+    
+
     uint8_t RX_Message_ISR[8];
     uint32_t id;
+
+    Serial.println("Started");
+    float startTime = micros();
+    ///////////////////////////////////////
+
     CAN_RX(id, RX_Message_ISR);
+
+    //////////////////////////////////////
+        
+    float final_time = micros() - startTime;
+    accumulator += final_time;
+    counter += 1;
+    Serial.print("Worst Case Time for CAN_RX_ISR (ms): ");
+    Serial.println(accumulator/(counter * 1000));
+    Serial.println("Finished");
+    
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     xQueueSendFromISR(msgInQ, RX_Message_ISR, &xHigherPriorityTaskWoken);
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+
+    
 }
 
 // CAN TX ISR: Releases a transmit mailbox slot.
 void CAN_TX_ISR(void) {
+
+    Serial.println("Started");
+    float startTime = micros();
+    ///////////////////////////////////////
+
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     xSemaphoreGiveFromISR(CAN_TX_Semaphore, &xHigherPriorityTaskWoken);
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+
+    //////////////////////////////////////
+        
+    float final_time = micros() - startTime;
+    accumulator += final_time;
+    counter += 1;
+    Serial.print("Worst Case Time for CAN_TX_ISR (ms): ");
+    Serial.println(accumulator/(counter * 1000));
+    Serial.println("Finished");
+
 }
 
 void CAN_RX_Task(void *pvParameters) {
@@ -36,29 +74,43 @@ void CAN_RX_Task(void *pvParameters) {
     #endif
     
     while (1) {
+
+
+        Serial.println("Started");
+        float startTime = micros();
+        ///////////////////////////////////////
+
         #ifndef TEST_CAN_RX
         // In normal operation, receive a message from the CAN queue
         xQueueReceive(msgInQ, msgIn, portMAX_DELAY);
         #endif
-        
         noInterrupts();
         memcpy(globalRXMessage, msgIn, 8);
         interrupts();
-
         xSemaphoreTake(sysMutex, portMAX_DELAY);
         canRxSuccess = true;
         stepSizes = getArray();
         xSemaphoreGive(sysMutex);
-
+        
         #ifdef TEST_CAN_RX
-        // Optionally, print or log the message if in test mode
-        Serial.print("Simulated CAN RX Message: ");
-        for (int i = 0; i < 8; i++) {
-            Serial.print(simulatedMessage[i], HEX);
-            Serial.print(" ");
-        }
-        Serial.println();
+        // // Optionally, print or log the message if in test mode
+        // Serial.print("Simulated CAN RX Message: ");
+        // for (int i = 0; i < 8; i++) {
+        //     Serial.print(simulatedMessage[i], HEX);
+        //     Serial.print(" ");
+        // }
+        // Serial.println();
         #endif
+
+        //////////////////////////////////////
+        
+        float final_time = micros() - startTime;
+        accumulator += final_time;
+        counter += 1;
+        Serial.print("Worst Case Time for CAN_RX (ms): ");
+        Serial.println(accumulator/(counter * 1000));
+        Serial.println("Finished");
+
     }
 }
 
@@ -67,6 +119,10 @@ void CAN_TX_Task(void *pvParameters) {
     uint8_t msgOut[8];
 
     while (1) {
+        Serial.println("Started");
+        float startTime = micros();
+        ///////////////////////////////////////
+
         #ifdef TEST_CAN_TX
         // In test mode, simulate a CAN message
         uint8_t simulatedMessage[8] = {0};  // Simulated CAN message
@@ -82,21 +138,31 @@ void CAN_TX_Task(void *pvParameters) {
         // Wait for an available transmit mailbox (or simulate CAN transmission in test mode)
         xSemaphoreTake(CAN_TX_Semaphore, portMAX_DELAY);
 
-        #ifdef TEST_CAN_TX
-        // In test mode, simulate the CAN transmission
-        Serial.print("Simulated CAN TX Message: ");
-        for (int i = 0; i < 8; i++) {
-            Serial.print(msgOut[i], HEX);
-            Serial.print(" ");
-        }
-        Serial.println();
-        canTxSuccess = true;  // Message successfully "sent" in test mode
-        #else
+        // #ifdef TEST_CAN_TX
+        // // In test mode, simulate the CAN transmission
+        // Serial.print("Simulated CAN TX Message: ");
+        // for (int i = 0; i < 8; i++) {
+        //     Serial.print(msgOut[i], HEX);
+        //     Serial.print(" ");
+        // }
+        // Serial.println();
+        // canTxSuccess = true;  // Message successfully "sent" in test mode
+        // #else
         // In normal operation, send the CAN message
         if (CAN_TX(0x123, msgOut) == 0) {
             canTxSuccess = true;  // Message successfully sent
         }
-        #endif
+        // #endif
+
+        //////////////////////////////////////
+        
+        float final_time = micros() - startTime;
+        accumulator += final_time;
+        counter += 1;
+        Serial.print("Worst Case Time for CAN_TX (ms): ");
+        Serial.println(accumulator/(counter * 1000));
+        Serial.println("Finished");
+
     }
 }
 

@@ -3,13 +3,15 @@
 
 // Single Piano
 #define SINGLE_PIANO
-#define DUAL_PIANO
+// #define DUAL_PIANO
 
 #define LEFT_PIANO
 // Uncomment to enable the test
 // #define TEST_DISPLAY
 // #define TEST_SCAN_KEYS
 // #define TEST_ISR
+// #define TEST_CAN_TX_ISR
+// #define TEST_CAN_RX_ISR
 // #define TEST_CAN_TX
 // #define TEST_CAN_RX
 
