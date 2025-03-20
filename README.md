@@ -17,8 +17,6 @@
 4. [Analysis](#4-analysis)   
 5. [References](#5-references)  
 
----
-
 ## 1. Introduction 
 
 This project focuses on the embedded software development for controlling a music synthesizer using an ST NUCLEO-L432KC microcontroller. It incorporates various real-time programming and system analysis techniques to successfully implement a range of features for the keyboard-based embedded system, as detailed in this documentation.
@@ -34,8 +32,6 @@ The microcontroller is equipped with an STM32L432KCU6U processor, which is based
 This project was developed by EEE and EIE students from Imperial College London for the second coursework of the ELEC60013 - Embedded Systems module. 
 
 **Team members:** Anson Chin, Eddie Moualek and Samuel Khoo 
-
----
 
 ## 2. Features
 
@@ -58,8 +54,6 @@ This project was developed by EEE and EIE students from Imperial College London 
   - A hidden tone guessing game was implemented, where the system generates a random note, and the user must guess which key corresponds to that note.
   - The user is provided with feedback on whether their guess is correct or not, and the game continues with a new note after each guess.
   - This game provides an interactive and fun way for users to engage with the synthesizer while testing their musical knowledge and recognition of different tones.
-
----
 
 ## 3. Tasks and Interrupts
 
@@ -129,8 +123,6 @@ void updateStepSizeFromKeys(const std::bitset<12>& keyStates) {
 - **Atomic Operations**: Prevents race conditions when updating `currentStepSize`.
 - **Delays**: A short delay (`delayMicroseconds(3)`) stabilizes row activation, reducing false detections.
 
----
-
 ### 3.2. DisplayUpdateTask (Thread)
 
 The `DisplayUpdateTask` is a **FreeRTOS thread** responsible for updating the OLED display with real-time system information, including pressed keys, knob positions, and game-related messages.  
@@ -172,7 +164,6 @@ The `DisplayUpdateTask` is a **FreeRTOS thread** responsible for updating the OL
 - **Optimized Execution Time**: 24.1 ms max, ensuring no delay in audio processing.  
 - **Efficient Resource Management**: Mutex locks prevent conflicts, and buffered rendering reduces CPU load.  
 - **Flexible Display Handling**: Can switch between normal synthesizer mode and game mode dynamically.  
----
 
 ### 3.3. SampleISR (Interrupt)
 
@@ -225,16 +216,12 @@ ON INTERRUPT:
 - **Efficient Volume Control**  
   - Uses **bit-shifting instead of multiplication** to quickly scale amplitude.  
 
----
-
 ### 3.4. CAN_TX_Task (Thread)
 Manages the transmission of CAN messages for the synthesized note(s).
 
 - **Implementation**: Thread (FreeRTOS task)
 - **Initiation Interval**: 60 milliseconds for 36 iterations (FILLER FOR EDDIE)
 - **Measured Maximum Execution Time**: 12 microseconds (FILLER FOR EDDIE)
-
----
 
 ### 3.5. CAN_RX_Task (Thread)
 Handles incoming CAN messages and takes the necessary action (e.g., playing or stopping a note).
@@ -243,8 +230,6 @@ Handles incoming CAN messages and takes the necessary action (e.g., playing or s
 - **Initiation Interval**: 25.2 milliseconds for 36 iterations (FILLER FOR EDDIE)
 - **Measured Maximum Execution Time**: 82.7 microseconds (FILLER FOR EDDIE)
 
----
-
 ### 3.6. CAN_TX_ISR (Interrupt)
 Triggered when a CAN message is sent, ensuring that the CAN transmission buffer does not overflow.
 
@@ -252,16 +237,12 @@ Triggered when a CAN message is sent, ensuring that the CAN transmission buffer 
 - **Initiation Interval**: 60 milliseconds for 36 iterations (FILLER FOR EDDIE)
 - **Measured Maximum Execution Time**: 5.2 microseconds (FILLER FOR EDDIE)
 
----
-
 ### 3.7. CAN_RX_ISR (Interrupt)
 Triggered when a CAN message is received and copies it to the incoming message queue.
 
 - **Implementation**: Interrupt (ISR)
 - **Initiation Interval**: 25.2 milliseconds for 36 iterations (FILLER FOR EDDIE)
 - **Measured Maximum Execution Time**: 10 microseconds (FILLER FOR EDDIE)
-
----
 
 ### 3.8. GameTask (Thread)
 
@@ -322,8 +303,6 @@ LOOP forever:
 - **Efficient Execution**  
   - Uses atomic operations to update `currentStepSize`, preventing race conditions.  
   - Short delays prevent excessive CPU usage.  
-
----
 
 ## 4. Analysis
 
@@ -399,8 +378,6 @@ This indicates that the system is efficiently utilizing most of its resources (a
 
 ### 4.5. Conclusion
 This analysis proves that the real-time operating system (RTOS) effectively manages all tasks within the available computational resources of the microcontroller. Despite various tasks demanding CPU time, the system manages to avoid deadlocks, handle shared resources efficiently, and fulfill all deadlines, ensuring smooth operation of the synthesizer. With the system's CPU utilization well below 100%, there is ample capacity for additional features, optimizations, or handling unforeseen computational demands.
-
----
 
 ## 5. References
 
