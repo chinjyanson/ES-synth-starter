@@ -252,7 +252,7 @@ Handles incoming CAN messages and takes the necessary action (e.g., playing or s
 Triggered when a CAN message is sent, ensuring that the CAN transmission buffer does not overflow.
 
 - **Implementation**: Interrupt (ISR)
-  - The `CAN_TX_ISR` is an interrupt service routine that is invoked whenever a transmission mailbox becomes available. Its sole purpose is to release the counting semaphore `(CAN_TX_Semaphore)` using `xSemaphoreGiveFromISR()`. This signal allows the `CAN_TX_Task` to know that a new mailbox is free for a subsequent transmission. Because this ISR only performs a very short operation, it minimizes the risk of interrupt latency affecting system performance.
+  - The `CAN_TX_ISR` is an interrupt service routine that is invoked whenever a transmission mailbox becomes available. Its sole purpose is to release the counting semaphore (`CAN_TX_Semaphore`) using `xSemaphoreGiveFromISR()`. This signal allows the `CAN_TX_Task` to know that a new mailbox is free for a subsequent transmission. Because this ISR only performs a very short operation, it minimizes the risk of interrupt latency affecting system performance.
 - **Initiation Interval**: 60 milliseconds for 36 iterations
   - This ISR is called whenever a mailbox frees up. In a scenario where 36 messages are transmitted every 60 milliseconds, the effective initiation interval for the ISR events remains consistent with the system’s transmission rate.
 - **Measured Maximum Execution Time**: 5.2 microseconds
