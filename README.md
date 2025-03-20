@@ -226,7 +226,7 @@ ON INTERRUPT:
 Manages the transmission of CAN messages for the synthesized note(s).
 
 - **Implementation**: Thread (FreeRTOS task)
-  - This task is implemented as a FreeRTOS thread that continuously waits on a transmit queue `(msgOutQ)`. When a new message is enqueued (for example, from key state changes), the task retrieves the message, then takes a counting semaphore `(CAN_TX_Semaphore)` to ensure that there is a free CAN transmission mailbox. Once a mailbox is available, it calls `CAN_TX(0x123, msgOut)` to send the message. This design decouples the application-level message generation from the actual transmission, ensuring that tasks do not block on hardware delays.
+  - This task is implemented as a FreeRTOS thread that continuously waits on a transmit queue (`msgOutQ`). When a new message is enqueued (for example, from key state changes), the task retrieves the message, then takes a counting semaphore (`CAN_TX_Semaphore`) to ensure that there is a free CAN transmission mailbox. Once a mailbox is available, it calls `CAN_TX(0x123, msgOut)` to send the message. This design decouples the application-level message generation from the actual transmission, ensuring that tasks do not block on hardware delays.
 - **Initiation Interval**: 60 milliseconds for 36 iterations
   - In the worst-case scenario, 36 messages could be generated in 60 milliseconds. This means that the task is expected to process an iteration every 60 ms for the batch of 36 messages, ensuring that the transmit queue does not overflow even under high load.
 - **Measured Maximum Execution Time**: 12 microseconds
@@ -238,7 +238,7 @@ Manages the transmission of CAN messages for the synthesized note(s).
 Handles incoming CAN messages and takes the necessary action (e.g., playing or stopping a note).
 
 - **Implementation**: Thread (FreeRTOS task)
-  - This task (referred to as the decodeTask in the code) is implemented as a FreeRTOS thread that blocks on a reception queue `(msgInQ)`. When a CAN message is received, the `CAN_RX_ISR` enqueues the message into `msgInQ`. The decode task then retrieves each message and processes it: for key press messages, it calculates the new step size by combining a base frequency (from a predefined table) with an octave multiplier (using bit shifts); for key release messages, it sets the step size to zero. Updates to shared variables, such as the global step size and the display buffer for the last received message, are protected by a mutex.
+  - This task (referred to as the decodeTask in the code) is implemented as a FreeRTOS thread that blocks on a reception queue (`msgInQ`). When a CAN message is received, the `CAN_RX_ISR` enqueues the message into `msgInQ`. The decode task then retrieves each message and processes it: for key press messages, it calculates the new step size by combining a base frequency (from a predefined table) with an octave multiplier (using bit shifts); for key release messages, it sets the step size to zero. Updates to shared variables, such as the global step size and the display buffer for the last received message, are protected by a mutex.
 - **Initiation Interval**: 25.2 milliseconds for 36 iterations
   - Under worst-case conditions, if 36 messages are received, the task should ideally process them within 25.2 milliseconds in total. This interval ensures that even in high-traffic conditions, the system’s response remains within acceptable real-time bounds.
 - **Measured Maximum Execution Time**: 82.7 microseconds
