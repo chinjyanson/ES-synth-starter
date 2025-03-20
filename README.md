@@ -110,12 +110,43 @@ Triggered when a CAN message is received and copies it to the incoming message q
 ## 4. Analysis
 
 ### 4.1. Shared Resources
-- `recording vector`: Stores each track and is accessed by `scanKeyTask`, `displayTask`, `sendTask`, and `recieveTask`. It is protected by the `recordMutex` semaphore.
-- `notesPlayed`, `keyPress`: Shared by `displayTask` and `scanKeyTask` and protected by `keyArrayMutex`.
-- `amplitudeAmp`, `amplitudeState`, `currentStepMap`: Protected by atomic operations to ensure thread safety when used in both `recieveTask` and `sampleISR`.
+
+The following resources are shared among multiple tasks and protected by appropriate synchronization mechanisms:
+
+```cpp
+struct SystemState {
+    bool areAllKnobSPressed;
+    bool gameActiveOverride = false;
+    int knob3Rotation;
+    std::bitset<32> inputs;
+    std::bitset<12> keyStates;
+};
+```
+
+- **`inputs`**: This bitset stores the status of all input keys and control elements. It is accessed by different tasks and is protected by the `mutex` to ensure thread safety.
+- **`areAllKnobSPressed`**: This boolean variable tracks whether all knobs are pressed. It is accessed and modified by various tasks and is synchronized using the `mutex`.
+- **`gameActiveOverride`**: A boolean flag that controls whether the game override is active. It can be accessed by different tasks, and its access is protected by the `mutex`.
+- **`knob3Rotation`**: This variable tracks the rotation of knob 3 and is used by multiple tasks. Its access is synchronized using the `mutex`.
+- **`keyStates`**: A bitset representing the states of the 12 keys. It is shared between tasks and protected using the `mutex` to prevent data inconsistencies.
+
 
 ### 4.2. Deadlocks
-The system is deadlock-free, as the only interdependent mutex usage occurs in `scanKeyTask` (using both `recordMutex` and `keyArrayMutex`), which is carefully managed.
+
+A **deadlock** occurs when two or more tasks are in a state of waiting for each other to release resources (e.g., mutexes) that they need to continue execution. This can lead to a situation where none of the tasks involved can proceed, which would cause the system to freeze or hang. 
+
+In real-time embedded systems, preventing deadlocks is crucial for ensuring system stability and responsiveness. This can be achieved through careful management of mutexes, ensuring that tasks access shared resources in a safe, consistent manner.
+
+#### Mutex Usage
+
+In our system, a **single mutex** (`sysState.mutex`) is used to protect the shared `SystemState` structure. This structure includes critical variables, such as `keyStates`, that are accessed by multiple tasks. The mutex is used to ensure **mutual exclusion** when modifying these shared resources, preventing race conditions where multiple tasks try to access or modify the variables simultaneously.
+
+Here is an example of how the mutex is used:
+
+```cpp
+xSemaphoreTake(sysState.mutex, portMAX_DELAY);  // Wait for the mutex
+sysState.keyStates = localKeys;                 // Modify the shared resource
+xSemaphoreGive(sysState.mutex);                 // Release the mutex
+```
 
 ### 4.3. Timing Analysis
 
