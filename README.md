@@ -63,47 +63,239 @@ This project was developed by EEE and EIE students from Imperial College London 
 
 ## 3. Tasks and Interrupts
 
-### 3.1. ScanKeyTask
-Handles keyArray reads and registers them into various parameters (Knobs, Menu, etc.). It also generates messages for the CAN task and inputs for the sound generator. ADSR stepping happens here.
+### 3.1. ScanKeyTask (Thread)
 
-- **Initiation Interval**: 20 milliseconds
-- **Measured Maximum Execution Time**: 241 microseconds (all 12 keys pressed)
+The `ScanKeyTask` is a **thread** responsible for scanning the 12-key keyboard, updating relevant parameters, handling CAN messaging, and managing ADSR envelope progression.
 
-### 3.2. DisplayUpdateTask
+#### **Task Overview**
+- **Implementation**: Thread (FreeRTOS task)
+- **Initiation Interval**: 20 milliseconds (50 Hz)
+- **Max Execution Time**: 241 microseconds (all 12 keys pressed)
+
+#### **Key Scanning Process**
+The `scanKeys()` function scans a 3x4 matrix by setting each row active and reading the columns to detect key presses. The results are stored in a 12-bit bitset.
+
+```cpp
+std::bitset<12> scanKeys() {
+    std::bitset<12> allKeys;
+    for (uint8_t row = 0; row < 3; row++) {
+        setRow(row);
+        delayMicroseconds(3);
+        std::bitset<4> cols = readCols();
+        for (uint8_t col = 0; col < 4; col++) {
+            allKeys[row * 4 + col] = cols[col];
+        }
+    }
+    return allKeys;
+}
+```
+
+#### **Key State Change Detection**
+`scanKeysTask` identifies key transitions (press/release) and sends the corresponding CAN messages.
+
+```cpp
+for (int i = 0; i < 12; i++) {
+    if (localKeys[i] != previousKeys[i]) {
+        uint8_t TX_Message[8] = { localKeys[i] ? 'P' : 'R', getOctaveNumber(), i };
+        xQueueSend(msgOutQ, TX_Message, portMAX_DELAY);
+    }
+}
+```
+
+#### **ADSR Envelope Stepping**
+The task updates `currentStepSize` based on key presses while ensuring thread safety.
+
+```cpp
+void updateStepSizeFromKeys(const std::bitset<12>& keyStates) {
+    uint32_t localStepSize = 0;
+
+    xSemaphoreTake(sysState.mutex, portMAX_DELAY);
+    bool gameOverride = sysState.gameActiveOverride;
+    xSemaphoreGive(sysState.mutex);
+    if (gameOverride) return;
+
+    xSemaphoreTake(sysMutex, portMAX_DELAY);
+    for (int i = 0; i < 12; i++) {
+        if (keyStates[i]) localStepSize = stepSizes[i];
+    }
+    xSemaphoreGive(sysMutex);
+
+    __atomic_store_n(&currentStepSize, localStepSize, __ATOMIC_RELAXED);
+}
+```
+
+#### **Thread Safety Considerations**
+- **Mutex Usage**: Ensures exclusive access to shared resources.
+- **Atomic Operations**: Prevents race conditions when updating `currentStepSize`.
+- **Delays**: A short delay (`delayMicroseconds(3)`) stabilizes row activation, reducing false detections.
+
+---
+
+### 3.2. DisplayUpdateTask (Thread)
 Updates the OLED screen with information on the synthesizer’s status, including the current waveform, volume, and octave settings.
 
+- **Implementation**: Thread (FreeRTOS task)
 - **Initiation Interval**: 100 milliseconds
 - **Measured Maximum Execution Time**: 18,604 microseconds (all 12 keys pressed)
 
-### 3.3. SampleISR
-Interrupt responsible for generating the audio output signal.
+---
 
-- **Initiation Interval**: 45.45 microseconds
-- **Measured Maximum Execution Time**: 28.0 microseconds (all 12 keys pressed)
+### 3.3. SampleISR (Interrupt)
 
-### 3.4. CAN_TX_Task
+The `SampleISR` is an **interrupt** responsible for generating the audio output signal in real-time. It calculates the next sample in the waveform based on the current step size and adjusts the volume dynamically.  
+
+#### **Task Overview**  
+- **Implementation**: Interrupt (ISR)  
+- **Initiation Interval**: 45.45 microseconds  
+- **Measured Maximum Execution Time**: 28.0 microseconds (all 12 keys pressed)  
+
+---
+
+#### **Pseudocode Explanation**  
+
+```plaintext
+ON INTERRUPT:
+    - Load the current step size (atomic operation)
+    - Update phase accumulator by adding step size
+    - Generate output waveform value from phase accumulator
+    - Retrieve knob rotation value for volume control
+    - Scale the waveform amplitude based on knob rotation
+    - Output the final waveform signal to the DAC
+```
+
+---
+
+#### **SampleISR Logic Breakdown**  
+
+1. **Phase Accumulator Update**  
+   - Uses a **static phase accumulator** that increments based on `stepSize`.  
+   - Higher `stepSize` values result in a **higher frequency output**.  
+
+2. **Waveform Generation**  
+   - Extracts the **8 most significant bits** of `phaseAcc` to generate a waveform.  
+   - Converts this to a **signed value (-128 to 127)**.  
+
+3. **Volume Control**  
+   - Reads `knob3Rotation` atomically.  
+   - The waveform amplitude is scaled using a **right shift** operation.  
+
+4. **Final Output to DAC**  
+   - The final waveform value is **offset by 128** to fit the DAC’s range (0–255).  
+   - Uses `analogWrite()` to send the processed waveform to the output pin.  
+
+---
+
+### **Key Features and Considerations**  
+
+- **Atomic Operations**  
+  - Ensures thread safety when reading `currentStepSize` and `knob3Rotation`.  
+
+- **Optimized Execution**  
+  - Uses **bitwise operations** for fast waveform computation.  
+  - Keeps ISR execution time **low** for real-time audio generation.  
+
+- **Efficient Volume Control**  
+  - Uses **bit-shifting instead of multiplication** to quickly scale amplitude.  
+
+---
+
+## 3.4. CAN_TX_Task (Thread)
 Manages the transmission of CAN messages for the synthesized note(s).
 
+- **Implementation**: Thread (FreeRTOS task)
 - **Initiation Interval**: 60 milliseconds for 36 iterations
 - **Measured Maximum Execution Time**: 12 microseconds
 
-### 3.5. CAN_RX_Task
+---
+
+## 3.5. CAN_RX_Task (Thread)
 Handles incoming CAN messages and takes the necessary action (e.g., playing or stopping a note).
 
+- **Implementation**: Thread (FreeRTOS task)
 - **Initiation Interval**: 25.2 milliseconds for 36 iterations
 - **Measured Maximum Execution Time**: 82.7 microseconds
 
-### 3.6. CAN_TX_ISR
+---
+
+## 3.6. CAN_TX_ISR (Interrupt)
 Triggered when a CAN message is sent, ensuring that the CAN transmission buffer does not overflow.
 
+- **Implementation**: Interrupt (ISR)
 - **Initiation Interval**: 60 milliseconds for 36 iterations
 - **Measured Maximum Execution Time**: 5.2 microseconds
 
-### 3.7. CAN_RX_ISR
+---
+
+## 3.7. CAN_RX_ISR (Interrupt)
 Triggered when a CAN message is received and copies it to the incoming message queue.
 
+- **Implementation**: Interrupt (ISR)
 - **Initiation Interval**: 25.2 milliseconds for 36 iterations
 - **Measured Maximum Execution Time**: 10 microseconds
+
+---
+
+### **3.8. GameTask (Thread)**  
+
+The `GameTask` is a **thread** that manages the note recognition game. It plays a randomly selected note and waits for the user to press the correct key before proceeding to the next round.  
+
+#### **Task Overview**  
+- **Implementation**: Thread (FreeRTOS task)  
+- **Initiation Interval**: 25.2 milliseconds  
+- **Measured Max Execution Time**: 10 microseconds  
+
+#### **Pseudocode Explanation**  
+
+```plaintext
+LOOP forever:
+    - Check if game mode is activated (all knobs pressed)
+    - IF not activated:
+        - Wait briefly and continue
+
+    - Select a random note from predefined note list
+    - Play the note for 2 seconds
+    - Stop the note after playing
+
+    - Allow user input (monitor key presses)
+    - WHILE no key is pressed:
+        - Wait and continue monitoring
+
+    - Check if the pressed key matches the correct note
+    - Store result (correct or incorrect)
+    - Display correct answer
+    - Wait before starting the next round
+```
+
+#### **GameTask Logic Breakdown**  
+
+1. **Game Activation**  
+   - The task continuously checks whether the game is active by monitoring if all knobs are pressed.  
+
+2. **Note Selection and Playback**  
+   - A random note is selected from an array of predefined frequencies.  
+   - The system plays the selected note for 2 seconds by updating `currentStepSize`.  
+
+3. **Waiting for User Input**  
+   - After playing the note, the system stops the sound.  
+   - The game then waits for the user to press any key.  
+
+4. **Checking User Response**  
+   - If the user presses the correct key, it registers a correct guess.  
+   - Otherwise, the system marks the response as incorrect and displays the correct answer.  
+
+5. **Prepare for Next Round**  
+   - The game introduces a short delay before selecting a new note.  
+   - It then checks if the game mode is still active before continuing.  
+
+#### **Key Features and Considerations**  
+
+- **Thread Safety**  
+  - Uses `sysState.gameActiveOverride` to prevent unintended key presses during note playback.  
+  - Ensures safe access to shared variables with mutexes.  
+
+- **Efficient Execution**  
+  - Uses atomic operations to update `currentStepSize`, preventing race conditions.  
+  - Short delays prevent excessive CPU usage.  
 
 ---
 
