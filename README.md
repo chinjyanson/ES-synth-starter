@@ -59,7 +59,7 @@ This project was developed by EEE and EIE students from Imperial College London 
 
 Below shows a rough timing diagram of how our tasks are thread safe and how the run:
 
-![alt text](https://github.com/chinjyanson/ES-synth-starter/img/timing.png)
+![alt text](https://github.com/chinjyanson/ES-synth-starter/blob/master/img/timing.png)
 
 
 ### 3.1. ScanKeyTask (Thread)
