@@ -21,7 +21,7 @@ void setup() {
     Serial.println("Initialising System...");
     initSystem();
     initCAN();
-
+    
     sampleTimer.setOverflow(22000, HERTZ_FORMAT);
     #ifndef DISABLE_SAMPLE_ISR
     sampleTimer.attachInterrupt(sampleISR);

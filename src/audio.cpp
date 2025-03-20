@@ -1,6 +1,7 @@
 #include "audio.hpp"
 #include "system.hpp"
 #include "pindef.hpp"
+#include "system.hpp"
 #include <Arduino.h>
 
 volatile uint32_t currentStepSize = 0;
@@ -8,7 +9,9 @@ std::array<uint32_t, 12> stepSizes = getArray();
 
 std::array<uint32_t, 12> getArray() {
     std::array<uint32_t, 12> result = {0};
+    xSemaphoreTake(sysMutex, portMAX_DELAY);
     int cur_octave = globalRXMessage[1] != 0 ? globalRXMessage[1] : 4;
+    xSemaphoreGive(sysMutex);
     double freq_factor = pow(2, 1.0/12.0);
     
     for (size_t i = 0; i < 12; i++) {

@@ -57,6 +57,11 @@ This project was developed by EEE and EIE students from Imperial College London 
 
 ## 3. Tasks and Interrupts
 
+Below shows a rough timing diagram of how our tasks are thread safe and how the run:
+
+![alt text](https://github.com/chinjyanson/ES-synth-starter/img/timing.png)
+
+
 ### 3.1. ScanKeyTask (Thread)
 
 The `ScanKeyTask` is a **thread** responsible for scanning the 12-key keyboard, updating relevant parameters, handling CAN messaging, and managing ADSR envelope progression.
