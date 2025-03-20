@@ -31,9 +31,9 @@ The microcontroller is equipped with an STM32L432KCU6U processor, which is based
 - Frameworks: STM32duino  
 - Hardware Abstraction Layers (HALs): CMSIS/STM32Cube  
 
-This project was developed by EEE and EIE students from Imperial College London for the second coursework of the ELEC60013 - Embedded Systems module.  
-**Team members:** Anson Chin, Eddie Moualek, Samuel Khoo.  
-- When configured as a receiver, the synthesizer plays or stops the appropriate note(s) upon receiving a message.
+This project was developed by EEE and EIE students from Imperial College London for the second coursework of the ELEC60013 - Embedded Systems module. 
+
+**Team members:** Anson Chin, Eddie Moualek and Samuel Khoo 
 
 ---
 
