@@ -123,6 +123,8 @@ void updateStepSizeFromKeys(const std::bitset<12>& keyStates) {
 - **Atomic Operations**: Prevents race conditions when updating `currentStepSize`.
 - **Delays**: A short delay (`delayMicroseconds(3)`) stabilizes row activation, reducing false detections.
 
+---
+
 ### 3.2. DisplayUpdateTask (Thread)
 
 The `DisplayUpdateTask` is a **FreeRTOS thread** responsible for updating the OLED display with real-time system information, including pressed keys, knob positions, and game-related messages.  
@@ -164,6 +166,8 @@ The `DisplayUpdateTask` is a **FreeRTOS thread** responsible for updating the OL
 - **Optimized Execution Time**: 24.1 ms max, ensuring no delay in audio processing.  
 - **Efficient Resource Management**: Mutex locks prevent conflicts, and buffered rendering reduces CPU load.  
 - **Flexible Display Handling**: Can switch between normal synthesizer mode and game mode dynamically.  
+
+---
 
 ### 3.3. SampleISR (Interrupt)
 
@@ -216,12 +220,16 @@ ON INTERRUPT:
 - **Efficient Volume Control**  
   - Uses **bit-shifting instead of multiplication** to quickly scale amplitude.  
 
+---
+
 ### 3.4. CAN_TX_Task (Thread)
 Manages the transmission of CAN messages for the synthesized note(s).
 
 - **Implementation**: Thread (FreeRTOS task)
 - **Initiation Interval**: 60 milliseconds for 36 iterations (FILLER FOR EDDIE)
 - **Measured Maximum Execution Time**: 12 microseconds (FILLER FOR EDDIE)
+
+---
 
 ### 3.5. CAN_RX_Task (Thread)
 Handles incoming CAN messages and takes the necessary action (e.g., playing or stopping a note).
@@ -230,6 +238,8 @@ Handles incoming CAN messages and takes the necessary action (e.g., playing or s
 - **Initiation Interval**: 25.2 milliseconds for 36 iterations (FILLER FOR EDDIE)
 - **Measured Maximum Execution Time**: 82.7 microseconds (FILLER FOR EDDIE)
 
+---
+
 ### 3.6. CAN_TX_ISR (Interrupt)
 Triggered when a CAN message is sent, ensuring that the CAN transmission buffer does not overflow.
 
@@ -237,12 +247,16 @@ Triggered when a CAN message is sent, ensuring that the CAN transmission buffer 
 - **Initiation Interval**: 60 milliseconds for 36 iterations (FILLER FOR EDDIE)
 - **Measured Maximum Execution Time**: 5.2 microseconds (FILLER FOR EDDIE)
 
+---
+
 ### 3.7. CAN_RX_ISR (Interrupt)
 Triggered when a CAN message is received and copies it to the incoming message queue.
 
 - **Implementation**: Interrupt (ISR)
 - **Initiation Interval**: 25.2 milliseconds for 36 iterations (FILLER FOR EDDIE)
 - **Measured Maximum Execution Time**: 10 microseconds (FILLER FOR EDDIE)
+
+---
 
 ### 3.8. GameTask (Thread)
 
