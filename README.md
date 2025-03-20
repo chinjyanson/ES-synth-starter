@@ -47,9 +47,6 @@ This project was developed by EEE and EIE students from Imperial College London 
 
 ### 2.2. Advanced Features
 
-- **Octave Knob**
-  - Knob X was programmed to control the octave that the corresponding board/module plays in, with the octave ranging from 0-7.
-
 - **Hidden Game (Tone Guessing)**
   - A hidden tone guessing game was implemented, where the system generates a random note, and the user must guess which key corresponds to that note.
   - The user is provided with feedback on whether their guess is correct or not, and the game continues with a new note after each guess.
